@@ -3,14 +3,14 @@ hyperskill_project:
   ide_files: https://stepik.org/media/attachments/lesson/452671/additional_files.json
   is_template_based: false
   use_ide: true
-update_date: Sat, 06 Mar 2021 17:38:52 UTC
+update_date: Tue, 09 Mar 2021 18:36:11 UTC
 stages:
 - id: 765
   step: 11718
   is_completed: true
 - id: 766
   step: 11719
-  is_completed: false
+  is_completed: true
 - id: 767
   step: 11720
   is_completed: false
@@ -296,6 +296,8 @@ topics:
     theory_id: 6701
   - title: Data and object mapping
     theory_id: 8262
+  - title: Libraries
+    theory_id: 8504
   - title: Object-Relational Mapping (ORM)
     theory_id: 8312
   - title: Dependency management

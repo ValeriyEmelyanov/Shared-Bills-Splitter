@@ -19,11 +19,19 @@ public class ConsoleView {
         System.out.println("Illegal command arguments");
     }
 
-    public void printList(List<String> balance) {
+    public void printBalance(List<String> balance) {
         if (balance.isEmpty()) {
             System.out.println("No repayments need");
         } else {
             balance.forEach(System.out::println);
         }
+    }
+
+    public void printList(List<String> list) {
+        list.forEach(System.out::println);
+    }
+
+    public void printUnknownGroup() {
+        System.out.println("Unknown group");
     }
 }

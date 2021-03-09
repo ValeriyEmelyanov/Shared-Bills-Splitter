@@ -4,30 +4,26 @@ import splitter.controller.Controller;
 import splitter.model.Person;
 import splitter.model.Transaction;
 import splitter.service.PersonService;
+import splitter.service.TransactionService;
 
-import java.time.LocalDate;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.format.DateTimeFormatter;
 
 public class TransactionalOperation {
     private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd");
 
     protected void move(Controller controller, int fromIndex, int toIndex) {
-        String[] arguments = controller.getCommandArguments();
-        if (arguments.length < 3) {
+        String[] arguments = controller.getOperationArguments();
+        if (arguments.length != 3) {
             controller.getView().printInvalidCommandArguments();
             return;
         }
 
-        if (arguments.length == 3) {
-            fromIndex--;
-            toIndex--;
-        }
-
-        LocalDate date;
-        int sum;
+        BigDecimal sum;
         try {
-            date = arguments.length == 4 ? LocalDate.parse(arguments[0], formatter) : LocalDate.now();
-            sum = Integer.parseInt(arguments[arguments.length == 4 ? 3 : 2]);
+            sum = new BigDecimal(arguments[arguments.length - 1])
+                    .setScale(2, RoundingMode.UNNECESSARY);
         } catch (Exception e) {
             controller.getView().printInvalidCommandArguments();
             return;
@@ -40,7 +36,7 @@ public class TransactionalOperation {
             return;
         }
 
-        controller.getRegister().add(
-                new Transaction(date, from, to, sum));
+        TransactionService.add(
+                new Transaction(controller.getOperationDate(), from, to, sum));
     }
 }

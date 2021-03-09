@@ -2,42 +2,58 @@ package splitter.controller;
 
 import splitter.command.Command;
 import splitter.command.MenuCommand;
-import splitter.model.Register;
 import splitter.view.ConsoleView;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Controller {
     private final Scanner scanner;
     private final ConsoleView view;
+    private final Pattern pattern;
+    private final DateTimeFormatter formatter;
 
-    private final Register register;
-
-    private String[] commandArguments;
+    private LocalDate operationDate;
+    private String[] operationArguments;
+    private String[] argumentGroup;
 
     public Controller() {
         this.scanner = new Scanner(System.in);
         this.view = new ConsoleView();
-        this.register = new Register();
+        this.pattern = Pattern.compile("\\(.*\\)");
+        this.formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd");
     }
 
     public ConsoleView getView() {
         return view;
     }
-    public String[] getCommandArguments() {
-        return commandArguments;
+
+    public LocalDate getOperationDate() {
+        return operationDate;
     }
 
-    public Register getRegister() {
-        return register;
+    public String[] getOperationArguments() {
+        return operationArguments;
+    }
+
+    public String[] getArgumentGroup() {
+        return argumentGroup;
     }
 
     public void run() {
         String commandLine;
         while (!(commandLine = scanner.nextLine()).equalsIgnoreCase("exit")) {
-            String[] commandParts = commandLine.split("\\s+");
-            String commandName = parseCommandParts(commandParts);
+            String commandName;
+            try {
+                commandName = parseCommandLine(commandLine);
+            } catch (Exception e) {
+                view.printInvalidCommandArguments();
+                continue;
+            }
             if (commandName == null) {
                 view.printUnknownCommand();
                 continue;
@@ -54,33 +70,67 @@ public class Controller {
         }
     }
 
-    private String parseCommandParts(String[] commandParts) {
+    private String parseCommandLine(String commandLine) {
+        commandLine = extractOperatonDate(commandLine);
+        commandLine = extractArgumentGroup(commandLine);
+
+        String[] commandParts = commandLine.split("\\s+");
         String commandName = null;
 
         for (MenuCommand command : MenuCommand.values()) {
             if (command.name().equals(commandParts[0].toUpperCase())) {
                 commandName = commandParts[0].toUpperCase();
                 if (commandParts.length > 1) {
-                    commandArguments = Arrays.copyOfRange(
+                    operationArguments = Arrays.copyOfRange(
                             commandParts, 1, commandParts.length);
                 } else {
-                    commandArguments = new String[0];
+                    operationArguments = new String[0];
                 }
                 break;
             }
             if (commandParts.length > 1 &&
                     command.name().equals(commandParts[1].toUpperCase())) {
                 commandName = commandParts[1].toUpperCase();
-                commandArguments = new String[commandParts.length - 1];
-                commandArguments[0] = commandParts[0];
-                if (commandArguments.length > 1) {
+                operationArguments = new String[commandParts.length - 1];
+                operationArguments[0] = commandParts[0];
+                if (operationArguments.length > 1) {
                     System.arraycopy(commandParts, 2,
-                            commandArguments, 1, commandArguments.length - 1);
+                            operationArguments, 1, operationArguments.length - 1);
                 }
                 break;
             }
         }
 
         return commandName;
+    }
+
+    private String extractOperatonDate(String commandLine) {
+        if (commandLine.length() > 10) {
+            String maybeDate = commandLine.substring(0, 10);
+            if (maybeDate.matches("\\d{4}\\.\\d{2}\\.\\d{2}")) {
+                operationDate = LocalDate.parse(maybeDate, formatter);
+                return commandLine.substring(11).trim();
+            }
+        }
+        operationDate = LocalDate.now();
+        return commandLine;
+    }
+
+    private String extractArgumentGroup(String commandLine) {
+        String argGroupLine = null;
+        Matcher matcher = pattern.matcher(commandLine);
+        if (matcher.find()) {
+            argGroupLine = matcher.group(0);
+        }
+
+        if (argGroupLine != null) {
+            commandLine = commandLine.replace(argGroupLine, "");
+            argGroupLine = argGroupLine.replaceAll("[()]", "");
+            argumentGroup = argGroupLine.split(",\\s*");
+        } else {
+            argumentGroup = null;
+        }
+
+        return commandLine;
     }
 }

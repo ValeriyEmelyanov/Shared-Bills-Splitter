@@ -6,7 +6,9 @@ public enum MenuCommand implements Command {
     BALANCE(new BalanceCommand()),
     BORROW(new BorrowCommand()),
     EXIT(null),
+    GROUP(new GroupCommand()),
     HELP(new HelpCommand()),
+    PURCHASE(new Purchase()),
     REPAY(new RepayCommand());
 
     private final Command command;

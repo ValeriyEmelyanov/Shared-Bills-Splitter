@@ -309,6 +309,502 @@ files:
         }
     }
   learner_created: false
+- name: src/splitter/command/BalanceCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+    import splitter.model.Person;
+    import splitter.model.Transaction;
+
+    import java.time.LocalDate;
+    import java.time.format.DateTimeFormatter;
+    import java.util.ArrayList;
+    import java.util.List;
+    import java.util.Locale;
+    import java.util.Map;
+    import java.util.TreeMap;
+
+    public class BalanceCommand implements Command {
+        private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+
+        @Override
+        public void execute(Controller controller) {
+            String[] arguments = controller.getCommandArguments();
+
+            int currentIndex = 0;
+            LocalDate date = null;
+            BalanceMode mode = null;
+
+            if (currentIndex < arguments.length) {
+                try {
+                    date = LocalDate.parse(arguments[0], formatter);
+                    currentIndex++;
+                } catch (Exception ignored) {
+                }
+            }
+            if (currentIndex < arguments.length) {
+                mode = BalanceMode.valueOf(arguments[currentIndex].toUpperCase(Locale.ROOT));
+                currentIndex ++;
+            }
+
+            if (currentIndex < arguments.length) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            if (date == null) {
+                date = LocalDate.now();
+            }
+            if (mode == null) {
+                mode = BalanceMode.CLOSE;
+            }
+
+            if (mode == BalanceMode.OPEN) {
+                date = date.withDayOfMonth(1).minusDays(1);
+            }
+
+            Map<Person, Map<Person, Integer>> forDate = new TreeMap<>();
+            List<Transaction> list = controller.getRegister().getList();
+            for (Transaction record : list) {
+                if (record.getDate().isAfter(date)) {
+                    continue;
+                }
+
+                Map<Person, Integer> debts = forDate.computeIfAbsent(
+                        record.getCreditor(), k -> new TreeMap<>());
+                debts.put(record.getDebtor(),
+                        debts.getOrDefault(record.getDebtor(), 0) - record.getSum());
+
+                debts = forDate.computeIfAbsent(
+                        record.getDebtor(), k -> new TreeMap<>());
+                debts.put(record.getCreditor(),
+                        debts.getOrDefault(record.getCreditor(), 0) + record.getSum());
+            }
+
+            List<String> balance = new ArrayList<>();
+            for (Map.Entry<Person, Map<Person, Integer>> debtsEntry : forDate.entrySet()) {
+                for (Map.Entry<Person, Integer> entry : debtsEntry.getValue().entrySet()) {
+                    if (entry.getValue() <= 0) {
+                        continue;
+                    }
+                    balance.add(String.format("%s owes %s %d",
+                            debtsEntry.getKey().getName(),
+                            entry.getKey().getName(),
+                            entry.getValue()));
+                }
+            }
+
+            controller.getView().printList(balance);
+        }
+    }
+
+    enum BalanceMode {
+        OPEN, CLOSE;
+    }
+  learner_created: true
+- name: src/splitter/command/BorrowCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public class BorrowCommand extends TransactionalOperation implements Command {
+        @Override
+        public void execute(Controller controller) {
+            move(controller, 2, 1);
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/TransactionalOperation.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+    import splitter.model.Person;
+    import splitter.model.Transaction;
+    import splitter.service.PersonService;
+
+    import java.time.LocalDate;
+    import java.time.format.DateTimeFormatter;
+
+    public class TransactionalOperation {
+        private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+
+        protected void move(Controller controller, int fromIndex, int toIndex) {
+            String[] arguments = controller.getCommandArguments();
+            if (arguments.length < 3) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            if (arguments.length == 3) {
+                fromIndex--;
+                toIndex--;
+            }
+
+            LocalDate date;
+            int sum;
+            try {
+                date = arguments.length == 4 ? LocalDate.parse(arguments[0], formatter) : LocalDate.now();
+                sum = Integer.parseInt(arguments[arguments.length == 4 ? 3 : 2]);
+            } catch (Exception e) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            Person from = PersonService.getByName(arguments[fromIndex]);
+            Person to = PersonService.getByName(arguments[toIndex]);
+            if (from.equals(to)) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            controller.getRegister().add(
+                    new Transaction(date, from, to, sum));
+        }
+    }
+  learner_created: true
+- name: src/splitter/service/PersonService.java
+  visible: true
+  text: |
+    package splitter.service;
+
+    import splitter.model.Person;
+
+    import java.util.HashSet;
+    import java.util.Optional;
+    import java.util.Set;
+
+    public class PersonService {
+        private static final Set<Person> PEOPLE = new HashSet<>();
+
+        private PersonService() {
+        }
+
+        public static Person getByName(String name) {
+            Optional<Person> optionalPerson = PEOPLE.stream()
+                    .filter(p -> p.getName().equals(name))
+                    .findFirst();
+
+            if (optionalPerson.isPresent()) {
+                return optionalPerson.get();
+            }
+
+            Person person = new Person(name);
+            PEOPLE.add(person);
+            return person;
+        }
+    }
+  learner_created: true
+- name: src/splitter/model/Transaction.java
+  visible: true
+  text: |
+    package splitter.model;
+
+    import java.time.LocalDate;
+
+    public class Transaction {
+        private final LocalDate date;
+        private final Person creditor;
+        private final Person debtor;
+        private final int sum;
+
+        public Transaction(LocalDate date, Person from, Person to, int sum) {
+            this.date = date;
+            this.creditor = from;
+            this.debtor = to;
+            this.sum = sum;
+        }
+
+        public LocalDate getDate() {
+            return date;
+        }
+
+        public Person getCreditor() {
+            return creditor;
+        }
+
+        public Person getDebtor() {
+            return debtor;
+        }
+
+        public int getSum() {
+            return sum;
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/Command.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public interface Command {
+        void execute(Controller controller);
+    }
+  learner_created: true
+- name: src/splitter/command/RepayCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public class RepayCommand extends TransactionalOperation implements Command {
+        @Override
+        public void execute(Controller controller) {
+            move(controller, 1, 2);
+        }
+    }
+  learner_created: true
+- name: src/splitter/model/Person.java
+  visible: true
+  text: |
+    package splitter.model;
+
+    import java.util.Objects;
+
+    public class Person implements Comparable<Person> {
+        private final String name;
+
+        public Person(String name) {
+            this.name = name;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Person person = (Person) o;
+            return Objects.equals(getName(), person.getName());
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(getName());
+        }
+
+        @Override
+        public int compareTo(Person person) {
+            return name.compareTo(person.getName());
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/HelpCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public class HelpCommand implements Command {
+        @Override
+        public void execute(Controller controller) {
+            controller.getView().printCommandList();
+        }
+    }
+  learner_created: true
+- name: src/splitter/view/ConsoleView.java
+  visible: true
+  text: |
+    package splitter.view;
+
+    import splitter.command.MenuCommand;
+
+    import java.util.List;
+
+    public class ConsoleView {
+        public void printCommandList() {
+            for (MenuCommand menuCommand : MenuCommand.values()) {
+                System.out.println(menuCommand.name().toLowerCase());
+            }
+        }
+
+        public void printUnknownCommand() {
+            System.out.println("Unknown command. Print help to show commands list");
+        }
+
+        public void printInvalidCommandArguments() {
+            System.out.println("Illegal command arguments");
+        }
+
+        public void printList(List<String> balance) {
+            if (balance.isEmpty()) {
+                System.out.println("No repayments need");
+            } else {
+                balance.forEach(System.out::println);
+            }
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/MenuCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public enum MenuCommand implements Command {
+        BALANCE(new BalanceCommand()),
+        BORROW(new BorrowCommand()),
+        EXIT(null),
+        HELP(new HelpCommand()),
+        REPAY(new RepayCommand());
+
+        private final Command command;
+
+        MenuCommand(Command command) {
+            this.command = command;
+        }
+
+        @Override
+        public void execute(Controller controller) {
+            if (command == null) {
+                return;
+            }
+            command.execute(controller);
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/GroupCommand.java
+  visible: true
+  learner_created: true
+- name: src/splitter/command/Purchase.java
+  visible: true
+  learner_created: true
+- name: src/splitter/model/Group.java
+  visible: true
+  learner_created: true
+- name: src/splitter/service/GroupService.java
+  visible: true
+  learner_created: true
+- name: src/splitter/controller/Controller.java
+  visible: true
+  text: |
+    package splitter.controller;
+
+    import splitter.command.Command;
+    import splitter.command.MenuCommand;
+    import splitter.model.Register;
+    import splitter.view.ConsoleView;
+
+    import java.util.Arrays;
+    import java.util.Scanner;
+
+    public class Controller {
+        private final Scanner scanner;
+        private final ConsoleView view;
+
+        private final Register register;
+
+        private String[] commandArguments;
+
+        public Controller() {
+            this.scanner = new Scanner(System.in);
+            this.view = new ConsoleView();
+            this.register = new Register();
+        }
+
+        public ConsoleView getView() {
+            return view;
+        }
+        public String[] getCommandArguments() {
+            return commandArguments;
+        }
+
+        public Register getRegister() {
+            return register;
+        }
+
+        public void run() {
+            String commandLine;
+            while (!(commandLine = scanner.nextLine()).equalsIgnoreCase("exit")) {
+                String[] commandParts = commandLine.split("\\s+");
+                String commandName = parseCommandParts(commandParts);
+                if (commandName == null) {
+                    view.printUnknownCommand();
+                    continue;
+                }
+
+                Command menuCommand;
+                try {
+                    menuCommand = MenuCommand.valueOf(commandName);
+                } catch (IllegalArgumentException e) {
+                    view.printUnknownCommand();
+                    continue;
+                }
+                menuCommand.execute(this);
+            }
+        }
+
+        private String parseCommandParts(String[] commandParts) {
+            String commandName = null;
+
+            for (MenuCommand command : MenuCommand.values()) {
+                if (command.name().equals(commandParts[0].toUpperCase())) {
+                    commandName = commandParts[0].toUpperCase();
+                    if (commandParts.length > 1) {
+                        commandArguments = Arrays.copyOfRange(
+                                commandParts, 1, commandParts.length);
+                    } else {
+                        commandArguments = new String[0];
+                    }
+                    break;
+                }
+                if (commandParts.length > 1 &&
+                        command.name().equals(commandParts[1].toUpperCase())) {
+                    commandName = commandParts[1].toUpperCase();
+                    commandArguments = new String[commandParts.length - 1];
+                    commandArguments[0] = commandParts[0];
+                    if (commandArguments.length > 1) {
+                        System.arraycopy(commandParts, 2,
+                                commandArguments, 1, commandArguments.length - 1);
+                    }
+                    break;
+                }
+            }
+
+            return commandName;
+        }
+    }
+  learner_created: true
+- name: src/splitter/service/TransactionService.java
+  visible: true
+  text: |
+    package splitter.model;
+
+    import java.util.ArrayList;
+    import java.util.Collections;
+    import java.util.List;
+
+    public class Register {
+        private final List<Transaction> list;
+
+        public Register() {
+            this.list = new ArrayList<>();
+        }
+
+        public List<Transaction> getList() {
+            return Collections.unmodifiableList(list);
+        }
+
+        public void add(Transaction record) {
+            list.add(record);
+        }
+    }
+  learner_created: true
 feedback_link: https://hyperskill.org/projects/142/stages/766/implement#comment
-status: Unchecked
+status: Solved
+feedback:
+  message: Congratulations!
+  time: Tue, 09 Mar 2021 20:01:05 UTC
 record: -1

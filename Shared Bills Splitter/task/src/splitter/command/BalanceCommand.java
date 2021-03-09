@@ -3,9 +3,10 @@ package splitter.command;
 import splitter.controller.Controller;
 import splitter.model.Person;
 import splitter.model.Transaction;
+import splitter.service.TransactionService;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -13,76 +14,53 @@ import java.util.Map;
 import java.util.TreeMap;
 
 public class BalanceCommand implements Command {
-    private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd");
 
     @Override
     public void execute(Controller controller) {
-        String[] arguments = controller.getCommandArguments();
+        String[] arguments = controller.getOperationArguments();
 
-        int currentIndex = 0;
-        LocalDate date = null;
         BalanceMode mode = null;
 
-        if (currentIndex < arguments.length) {
-            try {
-                date = LocalDate.parse(arguments[0], formatter);
-                currentIndex++;
-            } catch (Exception ignored) {
-            }
-        }
-        if (currentIndex < arguments.length) {
-            mode = BalanceMode.valueOf(arguments[currentIndex].toUpperCase(Locale.ROOT));
-            currentIndex ++;
-        }
+        mode = arguments.length == 1
+                ? BalanceMode.valueOf(arguments[0].toUpperCase(Locale.ROOT))
+                : BalanceMode.CLOSE;
 
-        if (currentIndex < arguments.length) {
-            controller.getView().printInvalidCommandArguments();
-            return;
-        }
-
-        if (date == null) {
-            date = LocalDate.now();
-        }
-        if (mode == null) {
-            mode = BalanceMode.CLOSE;
-        }
-
+        LocalDate operationDate = controller.getOperationDate();
         if (mode == BalanceMode.OPEN) {
-            date = date.withDayOfMonth(1).minusDays(1);
+            operationDate = operationDate.withDayOfMonth(1).minusDays(1);
         }
 
-        Map<Person, Map<Person, Integer>> forDate = new TreeMap<>();
-        List<Transaction> list = controller.getRegister().getList();
-        for (Transaction record : list) {
-            if (record.getDate().isAfter(date)) {
+        Map<Person, Map<Person, BigDecimal>> forDate = new TreeMap<>();
+        for (Transaction record : TransactionService.getTransactions()) {
+            if (record.getDate().isAfter(operationDate)) {
                 continue;
             }
 
-            Map<Person, Integer> debts = forDate.computeIfAbsent(
+            Map<Person, BigDecimal> debts = forDate.computeIfAbsent(
                     record.getCreditor(), k -> new TreeMap<>());
             debts.put(record.getDebtor(),
-                    debts.getOrDefault(record.getDebtor(), 0) - record.getSum());
+                    debts.getOrDefault(record.getDebtor(), BigDecimal.ZERO).subtract(record.getSum()));
 
             debts = forDate.computeIfAbsent(
                     record.getDebtor(), k -> new TreeMap<>());
             debts.put(record.getCreditor(),
-                    debts.getOrDefault(record.getCreditor(), 0) + record.getSum());
+                    debts.getOrDefault(record.getCreditor(), BigDecimal.ZERO).add(record.getSum()));
         }
 
         List<String> balance = new ArrayList<>();
-        for (Map.Entry<Person, Map<Person, Integer>> debtsEntry : forDate.entrySet()) {
-            for (Map.Entry<Person, Integer> entry : debtsEntry.getValue().entrySet()) {
-                if (entry.getValue() <= 0) {
+        for (Map.Entry<Person, Map<Person, BigDecimal>> debtsEntry : forDate.entrySet()) {
+            for (Map.Entry<Person, BigDecimal> entry : debtsEntry.getValue().entrySet()) {
+                if (entry.getValue().compareTo(BigDecimal.ZERO) <= 0) {
                     continue;
                 }
-                balance.add(String.format("%s owes %s %d",
+                balance.add(String.format("%s owes %s %s",
                         debtsEntry.getKey().getName(),
                         entry.getKey().getName(),
-                        entry.getValue()));
+                        entry.getValue().toString()));
             }
         }
 
-        controller.getView().printList(balance);
+        controller.getView().printBalance(balance);
     }
 }
 
