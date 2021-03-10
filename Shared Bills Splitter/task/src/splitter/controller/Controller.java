@@ -127,8 +127,13 @@ public class Controller {
             commandLine = commandLine.replace(argGroupLine, "");
             argGroupLine = argGroupLine.replaceAll("[()]", "");
             argumentGroup = argGroupLine.split(",\\s*");
+            for (int i = 0; i < argumentGroup.length; i++) {
+                if (argumentGroup[i].startsWith("+")) {
+                    argumentGroup[i] = argumentGroup[i].substring(1);
+                }
+            }
         } else {
-            argumentGroup = null;
+            argumentGroup = new String[0];
         }
 
         return commandLine;

@@ -360,6 +360,761 @@ files:
         }
     }
   learner_created: false
+- name: src/splitter/command/BalanceCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+    import splitter.model.Person;
+    import splitter.model.Transaction;
+    import splitter.service.TransactionService;
+
+    import java.math.BigDecimal;
+    import java.time.LocalDate;
+    import java.util.ArrayList;
+    import java.util.List;
+    import java.util.Locale;
+    import java.util.Map;
+    import java.util.TreeMap;
+
+    public class BalanceCommand implements Command {
+
+        @Override
+        public void execute(Controller controller) {
+            String[] arguments = controller.getOperationArguments();
+
+            BalanceMode mode = null;
+
+            mode = arguments.length == 1
+                    ? BalanceMode.valueOf(arguments[0].toUpperCase(Locale.ROOT))
+                    : BalanceMode.CLOSE;
+
+            LocalDate operationDate = controller.getOperationDate();
+            if (mode == BalanceMode.OPEN) {
+                operationDate = operationDate.withDayOfMonth(1).minusDays(1);
+            }
+
+            Map<Person, Map<Person, BigDecimal>> forDate = new TreeMap<>();
+            for (Transaction record : TransactionService.getTransactions()) {
+                if (record.getDate().isAfter(operationDate)) {
+                    continue;
+                }
+
+                Map<Person, BigDecimal> debts = forDate.computeIfAbsent(
+                        record.getCreditor(), k -> new TreeMap<>());
+                debts.put(record.getDebtor(),
+                        debts.getOrDefault(record.getDebtor(), BigDecimal.ZERO).subtract(record.getSum()));
+
+                debts = forDate.computeIfAbsent(
+                        record.getDebtor(), k -> new TreeMap<>());
+                debts.put(record.getCreditor(),
+                        debts.getOrDefault(record.getCreditor(), BigDecimal.ZERO).add(record.getSum()));
+            }
+
+            List<String> balance = new ArrayList<>();
+            for (Map.Entry<Person, Map<Person, BigDecimal>> debtsEntry : forDate.entrySet()) {
+                for (Map.Entry<Person, BigDecimal> entry : debtsEntry.getValue().entrySet()) {
+                    if (entry.getValue().compareTo(BigDecimal.ZERO) <= 0) {
+                        continue;
+                    }
+                    balance.add(String.format("%s owes %s %s",
+                            debtsEntry.getKey().getName(),
+                            entry.getKey().getName(),
+                            entry.getValue().toString()));
+                }
+            }
+
+            controller.getView().printBalance(balance);
+        }
+    }
+
+    enum BalanceMode {
+        OPEN, CLOSE;
+    }
+  learner_created: true
+- name: src/splitter/command/BorrowCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public class BorrowCommand extends TransactionalOperation implements Command {
+        @Override
+        public void execute(Controller controller) {
+            move(controller, 1, 0);
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/TransactionalOperation.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+    import splitter.model.Person;
+    import splitter.model.Transaction;
+    import splitter.service.PersonService;
+    import splitter.service.TransactionService;
+
+    import java.math.BigDecimal;
+    import java.math.RoundingMode;
+    import java.time.format.DateTimeFormatter;
+
+    public class TransactionalOperation {
+        private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+
+        protected void move(Controller controller, int fromIndex, int toIndex) {
+            String[] arguments = controller.getOperationArguments();
+            if (arguments.length != 3) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            BigDecimal sum;
+            try {
+                sum = new BigDecimal(arguments[arguments.length - 1])
+                        .setScale(2, RoundingMode.UNNECESSARY);
+            } catch (Exception e) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            Person from = PersonService.getByName(arguments[fromIndex]);
+            Person to = PersonService.getByName(arguments[toIndex]);
+            if (from.equals(to)) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            TransactionService.add(
+                    new Transaction(controller.getOperationDate(), from, to, sum));
+        }
+    }
+  learner_created: true
+- name: src/splitter/model/Group.java
+  visible: true
+  text: |
+    package splitter.model;
+
+    import java.util.Collections;
+    import java.util.Set;
+    import java.util.TreeSet;
+
+    public class Group {
+        private final Set<Person> members = new TreeSet<>();
+        private final String name;
+
+        public Group(String name, Set<Person> members) {
+            this.name = name;
+            this.members.addAll(members);
+        }
+
+        public Group(String name, Person... persons) {
+            this.name = name;
+            this.members.addAll(Set.of(persons));
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public Set<Person> getMembers() {
+            return Collections.unmodifiableSet(members);
+        }
+
+    }
+  learner_created: true
+- name: src/splitter/service/PersonService.java
+  visible: true
+  text: |
+    package splitter.service;
+
+    import splitter.model.Person;
+
+    import java.util.HashSet;
+    import java.util.Optional;
+    import java.util.Set;
+
+    public class PersonService {
+        private static final Set<Person> PEOPLE = new HashSet<>();
+
+        private PersonService() {
+        }
+
+        public static Person getByName(String name) {
+            Optional<Person> optionalPerson = PEOPLE.stream()
+                    .filter(p -> p.getName().equals(name))
+                    .findFirst();
+
+            if (optionalPerson.isPresent()) {
+                return optionalPerson.get();
+            }
+
+            Person person = new Person(name);
+            PEOPLE.add(person);
+            return person;
+        }
+    }
+  learner_created: true
+- name: src/splitter/model/Transaction.java
+  visible: true
+  text: |
+    package splitter.model;
+
+    import java.math.BigDecimal;
+    import java.time.LocalDate;
+
+    public class Transaction {
+        private final LocalDate date;
+        private final Person creditor;
+        private final Person debtor;
+        private final BigDecimal sum;
+
+        public Transaction(LocalDate date, Person from, Person to, BigDecimal sum) {
+            this.date = date;
+            this.creditor = from;
+            this.debtor = to;
+            this.sum = sum;
+        }
+
+        public LocalDate getDate() {
+            return date;
+        }
+
+        public Person getCreditor() {
+            return creditor;
+        }
+
+        public Person getDebtor() {
+            return debtor;
+        }
+
+        public BigDecimal getSum() {
+            return sum;
+        }
+    }
+  learner_created: true
+- name: src/splitter/service/GroupService.java
+  visible: true
+  text: |
+    package splitter.service;
+
+    import splitter.model.Group;
+
+    import java.util.Collections;
+    import java.util.HashMap;
+    import java.util.Map;
+    import java.util.Optional;
+
+    public class GroupService {
+        private static final Map<String, Group> GROUPS = new HashMap<>();
+
+        public GroupService() {
+        }
+
+        public static Map<String, Group> getGroups() {
+            return Collections.unmodifiableMap(GROUPS);
+        }
+
+        public static void put(Group group) {
+            GROUPS.put(group.getName(), group);
+        }
+
+        public static Optional<Group> getByName(String name) {
+            Group group = GROUPS.get(name);
+            if (group == null) {
+                return Optional.empty();
+            }
+            return Optional.of(group);
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/Command.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public interface Command {
+        void execute(Controller controller);
+    }
+  learner_created: true
+- name: src/splitter/command/RepayCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public class RepayCommand extends TransactionalOperation implements Command {
+        @Override
+        public void execute(Controller controller) {
+            move(controller, 0, 1);
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/GroupCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+    import splitter.model.Group;
+    import splitter.model.Person;
+    import splitter.service.GroupService;
+
+    import java.util.Arrays;
+    import java.util.Optional;
+    import java.util.Set;
+    import java.util.stream.Collectors;
+
+    public class GroupCommand implements Command {
+        @Override
+        public void execute(Controller controller) {
+            String[] arguments = controller.getOperationArguments();
+            GroupMode groupMode;
+            try {
+                groupMode = GroupMode.valueOf(arguments[0].toUpperCase());
+            } catch (IllegalArgumentException e) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            switch (groupMode) {
+                case CREATE:
+                    createGroup(controller, arguments);
+                    break;
+                case SHOW:
+                    showGroup(controller, arguments);
+                    break;
+                default:
+                    controller.getView().printInvalidCommandArguments();
+            }
+        }
+
+        private void showGroup(Controller controller, String[] arguments) {
+            if (arguments.length < 2) {
+                controller.getView().printInvalidCommandArguments();
+            }
+            Optional<Group> optional = GroupService.getByName(arguments[1]);
+            if (optional.isEmpty()) {
+                controller.getView().printUnknownGroup();
+                return;
+            }
+            Set<Person> members = optional.get().getMembers();
+            controller.getView().printList(
+                    members.stream()
+                            .map(Person::getName)
+                            .collect(Collectors.toList()));
+        }
+
+        private void createGroup(Controller controller, String[] arguments) {
+            String groupName = arguments[1];
+            if (groupName.matches(".*[a-z].*")) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            String[] argumentGroup = controller.getArgumentGroup();
+            if (argumentGroup == null || argumentGroup.length == 0) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            Set<Person> members = Arrays.stream(argumentGroup)
+                    .map(Person::new)
+                    .collect(Collectors.toSet());
+            GroupService.put(new Group(groupName, members));
+        }
+
+        enum GroupMode {
+            CREATE, SHOW;
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/Purchase.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+    import splitter.model.Group;
+    import splitter.model.Person;
+    import splitter.model.Transaction;
+    import splitter.service.GroupService;
+    import splitter.service.TransactionService;
+
+    import java.math.BigDecimal;
+    import java.math.RoundingMode;
+    import java.time.LocalDate;
+    import java.util.Map;
+    import java.util.Optional;
+    import java.util.Set;
+    import java.util.TreeMap;
+
+    public class Purchase implements Command {
+
+        @Override
+        public void execute(Controller controller) {
+            String[] commandArguments = controller.getOperationArguments();
+            String[] argumentGroup = controller.getArgumentGroup();
+            if (commandArguments.length != 3 || argumentGroup.length != 1) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            Optional<Group> optionalGroup = GroupService.getByName(argumentGroup[0]);
+            if (optionalGroup.isEmpty()) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            Set<Person> members = optionalGroup.get().getMembers();
+            LocalDate date;
+            Person funder = new Person(commandArguments[0]);
+            int intDivisor = members.size();
+            if (intDivisor == 0) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            BigDecimal sum = new BigDecimal(commandArguments[commandArguments.length - 1])
+                    .setScale(2, RoundingMode.UNNECESSARY);
+            BigDecimal divisor = BigDecimal.valueOf(intDivisor);
+            BigDecimal portion = sum.divide(divisor, RoundingMode.FLOOR);
+
+            Map<Person, BigDecimal> distribution = new TreeMap<>();
+            for (Person p : members) {
+                if (p.equals(funder)) {
+                    continue;
+                }
+                distribution.put(p, portion);
+            }
+
+            BigDecimal remainder = sum.subtract(portion.multiply(divisor));
+            if (remainder.compareTo(BigDecimal.ZERO) != 0) {
+                BigDecimal increment = new BigDecimal("0.01");
+                for (Map.Entry<Person, BigDecimal> entry : distribution.entrySet()) {
+                    if (entry.getKey().equals(funder)) {
+                        continue;
+                    }
+                    distribution.put(entry.getKey(), entry.getValue().add(increment));
+                    remainder = remainder.subtract(increment);
+                    if (remainder.compareTo(BigDecimal.ZERO) == 0) {
+                        break;
+                    }
+                }
+            }
+
+            for (Map.Entry<Person, BigDecimal> entry : distribution.entrySet()) {
+                if (funder.equals(entry.getKey())) {
+                    continue;
+                }
+                TransactionService.add(new Transaction(
+                        controller.getOperationDate(),
+                        funder,
+                        entry.getKey(),
+                        entry.getValue()
+                ));
+            }
+        }
+    }
+  learner_created: true
+- name: src/splitter/model/Person.java
+  visible: true
+  text: |
+    package splitter.model;
+
+    import java.util.Objects;
+
+    public class Person implements Comparable<Person> {
+        private final String name;
+
+        public Person(String name) {
+            this.name = name;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Person person = (Person) o;
+            return Objects.equals(getName(), person.getName());
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(getName());
+        }
+
+        @Override
+        public int compareTo(Person person) {
+            return name.compareTo(person.getName());
+        }
+    }
+  learner_created: true
+- name: src/splitter/controller/Controller.java
+  visible: true
+  text: |
+    package splitter.controller;
+
+    import splitter.command.Command;
+    import splitter.command.MenuCommand;
+    import splitter.view.ConsoleView;
+
+    import java.time.LocalDate;
+    import java.time.format.DateTimeFormatter;
+    import java.util.Arrays;
+    import java.util.Scanner;
+    import java.util.regex.Matcher;
+    import java.util.regex.Pattern;
+
+    public class Controller {
+        private final Scanner scanner;
+        private final ConsoleView view;
+        private final Pattern pattern;
+        private final DateTimeFormatter formatter;
+
+        private LocalDate operationDate;
+        private String[] operationArguments;
+        private String[] argumentGroup;
+
+        public Controller() {
+            this.scanner = new Scanner(System.in);
+            this.view = new ConsoleView();
+            this.pattern = Pattern.compile("\\(.*\\)");
+            this.formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+        }
+
+        public ConsoleView getView() {
+            return view;
+        }
+
+        public LocalDate getOperationDate() {
+            return operationDate;
+        }
+
+        public String[] getOperationArguments() {
+            return operationArguments;
+        }
+
+        public String[] getArgumentGroup() {
+            return argumentGroup;
+        }
+
+        public void run() {
+            String commandLine;
+            while (!(commandLine = scanner.nextLine()).equalsIgnoreCase("exit")) {
+                String commandName;
+                try {
+                    commandName = parseCommandLine(commandLine);
+                } catch (Exception e) {
+                    view.printInvalidCommandArguments();
+                    continue;
+                }
+                if (commandName == null) {
+                    view.printUnknownCommand();
+                    continue;
+                }
+
+                Command menuCommand;
+                try {
+                    menuCommand = MenuCommand.valueOf(commandName);
+                } catch (IllegalArgumentException e) {
+                    view.printUnknownCommand();
+                    continue;
+                }
+                menuCommand.execute(this);
+            }
+        }
+
+        private String parseCommandLine(String commandLine) {
+            commandLine = extractOperatonDate(commandLine);
+            commandLine = extractArgumentGroup(commandLine);
+
+            String[] commandParts = commandLine.split("\\s+");
+            String commandName = null;
+
+            for (MenuCommand command : MenuCommand.values()) {
+                if (command.name().equals(commandParts[0].toUpperCase())) {
+                    commandName = commandParts[0].toUpperCase();
+                    if (commandParts.length > 1) {
+                        operationArguments = Arrays.copyOfRange(
+                                commandParts, 1, commandParts.length);
+                    } else {
+                        operationArguments = new String[0];
+                    }
+                    break;
+                }
+                if (commandParts.length > 1 &&
+                        command.name().equals(commandParts[1].toUpperCase())) {
+                    commandName = commandParts[1].toUpperCase();
+                    operationArguments = new String[commandParts.length - 1];
+                    operationArguments[0] = commandParts[0];
+                    if (operationArguments.length > 1) {
+                        System.arraycopy(commandParts, 2,
+                                operationArguments, 1, operationArguments.length - 1);
+                    }
+                    break;
+                }
+            }
+
+            return commandName;
+        }
+
+        private String extractOperatonDate(String commandLine) {
+            if (commandLine.length() > 10) {
+                String maybeDate = commandLine.substring(0, 10);
+                if (maybeDate.matches("\\d{4}\\.\\d{2}\\.\\d{2}")) {
+                    operationDate = LocalDate.parse(maybeDate, formatter);
+                    return commandLine.substring(11).trim();
+                }
+            }
+            operationDate = LocalDate.now();
+            return commandLine;
+        }
+
+        private String extractArgumentGroup(String commandLine) {
+            String argGroupLine = null;
+            Matcher matcher = pattern.matcher(commandLine);
+            if (matcher.find()) {
+                argGroupLine = matcher.group(0);
+            }
+
+            if (argGroupLine != null) {
+                commandLine = commandLine.replace(argGroupLine, "");
+                argGroupLine = argGroupLine.replaceAll("[()]", "");
+                argumentGroup = argGroupLine.split(",\\s*");
+            } else {
+                argumentGroup = null;
+            }
+
+            return commandLine;
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/HelpCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public class HelpCommand implements Command {
+        @Override
+        public void execute(Controller controller) {
+            controller.getView().printCommandList();
+        }
+    }
+  learner_created: true
+- name: src/splitter/service/TransactionService.java
+  visible: true
+  text: |
+    package splitter.service;
+
+    import splitter.model.Transaction;
+
+    import java.util.ArrayList;
+    import java.util.Collections;
+    import java.util.List;
+
+    public class TransactionService {
+        private static final List<Transaction> TRANSACTIONS = new ArrayList<>();
+
+        private TransactionService() {
+        }
+
+        public static List<Transaction> getTransactions() {
+            return Collections.unmodifiableList(TRANSACTIONS);
+        }
+
+        public static void add(Transaction record) {
+            TRANSACTIONS.add(record);
+        }
+    }
+  learner_created: true
+- name: src/splitter/view/ConsoleView.java
+  visible: true
+  text: |
+    package splitter.view;
+
+    import splitter.command.MenuCommand;
+
+    import java.util.List;
+
+    public class ConsoleView {
+        public void printCommandList() {
+            for (MenuCommand menuCommand : MenuCommand.values()) {
+                System.out.println(menuCommand.name().toLowerCase());
+            }
+        }
+
+        public void printUnknownCommand() {
+            System.out.println("Unknown command. Print help to show commands list");
+        }
+
+        public void printInvalidCommandArguments() {
+            System.out.println("Illegal command arguments");
+        }
+
+        public void printBalance(List<String> balance) {
+            if (balance.isEmpty()) {
+                System.out.println("No repayments need");
+            } else {
+                balance.forEach(System.out::println);
+            }
+        }
+
+        public void printList(List<String> list) {
+            list.forEach(System.out::println);
+        }
+
+        public void printUnknownGroup() {
+            System.out.println("Unknown group");
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/MenuCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public enum MenuCommand implements Command {
+        BALANCE(new BalanceCommand()),
+        BORROW(new BorrowCommand()),
+        EXIT(null),
+        GROUP(new GroupCommand()),
+        HELP(new HelpCommand()),
+        PURCHASE(new Purchase()),
+        REPAY(new RepayCommand());
+
+        private final Command command;
+
+        MenuCommand(Command command) {
+            this.command = command;
+        }
+
+        @Override
+        public void execute(Controller controller) {
+            if (command == null) {
+                return;
+            }
+            command.execute(controller);
+        }
+    }
+  learner_created: true
 feedback_link: https://hyperskill.org/projects/142/stages/767/implement#comment
-status: Unchecked
+status: Solved
+feedback:
+  message: Congratulations!
+  time: Wed, 10 Mar 2021 16:36:41 UTC
 record: -1

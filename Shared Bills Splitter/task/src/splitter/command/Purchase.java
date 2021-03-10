@@ -1,7 +1,6 @@
 package splitter.command;
 
 import splitter.controller.Controller;
-import splitter.model.Group;
 import splitter.model.Person;
 import splitter.model.Transaction;
 import splitter.service.GroupService;
@@ -21,29 +20,45 @@ public class Purchase implements Command {
     public void execute(Controller controller) {
         String[] commandArguments = controller.getOperationArguments();
         String[] argumentGroup = controller.getArgumentGroup();
-        if (commandArguments.length != 3 || argumentGroup.length != 1) {
+        if (commandArguments.length != 3 || argumentGroup.length < 1) {
             controller.getView().printInvalidCommandArguments();
             return;
         }
 
-        Optional<Group> optionalGroup = GroupService.getByName(argumentGroup[0]);
-        if (optionalGroup.isEmpty()) {
+        Optional<Set<Person>> optionalMembers =
+                GroupService.groupMembersFromArgumentGroup(argumentGroup);
+        if (optionalMembers.isEmpty()) {
             controller.getView().printInvalidCommandArguments();
             return;
         }
 
-        Set<Person> members = optionalGroup.get().getMembers();
-        LocalDate date;
-        Person funder = new Person(commandArguments[0]);
+        Set<Person> members = optionalMembers.get();
         int intDivisor = members.size();
         if (intDivisor == 0) {
             controller.getView().printInvalidCommandArguments();
             return;
         }
 
-        BigDecimal sum = new BigDecimal(commandArguments[commandArguments.length - 1])
-                .setScale(2, RoundingMode.UNNECESSARY);
-        BigDecimal divisor = BigDecimal.valueOf(intDivisor);
+        BigDecimal sum;
+        Person funder;
+        try {
+            sum = new BigDecimal(commandArguments[commandArguments.length - 1])
+                    .setScale(2, RoundingMode.UNNECESSARY);
+            funder = new Person(commandArguments[0]);
+        } catch (Exception e) {
+            controller.getView().printInvalidCommandArguments();
+            return;
+        }
+
+        Map<Person, BigDecimal> distribution = getDistribution(funder, members,
+                sum, BigDecimal.valueOf(intDivisor));
+
+        createTransactions(controller.getOperationDate(), funder, distribution);
+    }
+
+    private Map<Person, BigDecimal> getDistribution(
+            Person funder, Set<Person> members,
+            BigDecimal sum, BigDecimal divisor) {
         BigDecimal portion = sum.divide(divisor, RoundingMode.FLOOR);
 
         Map<Person, BigDecimal> distribution = new TreeMap<>();
@@ -68,13 +83,16 @@ public class Purchase implements Command {
                 }
             }
         }
+        return distribution;
+    }
 
+    private void createTransactions(LocalDate operationDate, Person funder, Map<Person, BigDecimal> distribution) {
         for (Map.Entry<Person, BigDecimal> entry : distribution.entrySet()) {
             if (funder.equals(entry.getKey())) {
                 continue;
             }
             TransactionService.add(new Transaction(
-                    controller.getOperationDate(),
+                    operationDate,
                     funder,
                     entry.getKey(),
                     entry.getValue()

@@ -1,5 +1,6 @@
 package splitter.model;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 import java.util.TreeSet;
@@ -26,4 +27,11 @@ public class Group {
         return Collections.unmodifiableSet(members);
     }
 
+    public void addAll(Collection<Person> newMembers) {
+        members.addAll(newMembers);
+    }
+
+    public void removeAll(Collection<Person> toRemove) {
+        members.removeAll(toRemove);
+    }
 }

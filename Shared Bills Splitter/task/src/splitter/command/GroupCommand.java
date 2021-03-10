@@ -5,7 +5,6 @@ import splitter.model.Group;
 import splitter.model.Person;
 import splitter.service.GroupService;
 
-import java.util.Arrays;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -14,6 +13,10 @@ public class GroupCommand implements Command {
     @Override
     public void execute(Controller controller) {
         String[] arguments = controller.getOperationArguments();
+        if (arguments.length < 2) {
+            controller.getView().printInvalidCommandArguments();
+        }
+
         GroupMode groupMode;
         try {
             groupMode = GroupMode.valueOf(arguments[0].toUpperCase());
@@ -22,54 +25,76 @@ public class GroupCommand implements Command {
             return;
         }
 
-        switch (groupMode) {
-            case CREATE:
-                createGroup(controller, arguments);
-                break;
-            case SHOW:
-                showGroup(controller, arguments);
-                break;
-            default:
-                controller.getView().printInvalidCommandArguments();
-        }
-    }
-
-    private void showGroup(Controller controller, String[] arguments) {
-        if (arguments.length < 2) {
-            controller.getView().printInvalidCommandArguments();
-        }
-        Optional<Group> optional = GroupService.getByName(arguments[1]);
-        if (optional.isEmpty()) {
-            controller.getView().printUnknownGroup();
-            return;
-        }
-        Set<Person> members = optional.get().getMembers();
-        controller.getView().printList(
-                members.stream()
-                        .map(Person::getName)
-                        .collect(Collectors.toList()));
-    }
-
-    private void createGroup(Controller controller, String[] arguments) {
         String groupName = arguments[1];
         if (groupName.matches(".*[a-z].*")) {
             controller.getView().printInvalidCommandArguments();
             return;
         }
 
+        Group group = null;
+        if (groupMode != GroupMode.CREATE) {
+            Optional<Group> optionalGroup = GroupService.getByName(groupName);
+            if (optionalGroup.isEmpty()) {
+                controller.getView().printUnknownGroup();
+                return;
+            }
+            group = optionalGroup.get();
+        }
+
         String[] argumentGroup = controller.getArgumentGroup();
-        if (argumentGroup == null || argumentGroup.length == 0) {
+
+        switch (groupMode) {
+            case CREATE:
+                createGroup(controller, groupName, argumentGroup);
+                break;
+            case ADD:
+                changeGroupStructure(controller, group, argumentGroup, true);
+                break;
+            case REMOVE:
+                changeGroupStructure(controller, group, argumentGroup, false);
+            case SHOW:
+                showGroup(controller, group);
+                break;
+            default:
+                controller.getView().printInvalidCommandArguments();
+        }
+    }
+
+    private void createGroup(Controller controller, String groupName, String[] argumentGroup) {
+        Optional<Set<Person>> optionalMembers =
+                GroupService.groupMembersFromArgumentGroup(argumentGroup);
+        if (optionalMembers.isEmpty()) {
             controller.getView().printInvalidCommandArguments();
             return;
         }
 
-        Set<Person> members = Arrays.stream(argumentGroup)
-                .map(Person::new)
-                .collect(Collectors.toSet());
-        GroupService.put(new Group(groupName, members));
+        GroupService.put(new Group(groupName, optionalMembers.get()));
+    }
+
+    private void changeGroupStructure(Controller controller, Group group, String[] argumentGroup,
+                                      boolean isAdding) {
+        Optional<Set<Person>> optionalSet = GroupService.groupMembersFromArgumentGroup(argumentGroup);
+        if (optionalSet.isEmpty()) {
+            controller.getView().printInvalidCommandArguments();
+            return;
+        }
+
+        if (isAdding) {
+            group.addAll(optionalSet.get());
+        } else {
+            group.removeAll(optionalSet.get());
+        }
+    }
+
+    private void showGroup(Controller controller, Group group) {
+        Set<Person> members = group.getMembers();
+        controller.getView().printList(
+                members.stream()
+                        .map(Person::getName)
+                        .collect(Collectors.toList()));
     }
 
     enum GroupMode {
-        CREATE, SHOW;
+        CREATE, ADD, REMOVE, SHOW;
     }
 }

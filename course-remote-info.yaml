@@ -3,7 +3,7 @@ hyperskill_project:
   ide_files: https://stepik.org/media/attachments/lesson/452671/additional_files.json
   is_template_based: false
   use_ide: true
-update_date: Tue, 09 Mar 2021 18:36:11 UTC
+update_date: Wed, 10 Mar 2021 13:05:14 UTC
 stages:
 - id: 765
   step: 11718
@@ -13,7 +13,7 @@ stages:
   is_completed: true
 - id: 767
   step: 11720
-  is_completed: false
+  is_completed: true
 - id: 768
   step: 11721
   is_completed: false
@@ -292,12 +292,12 @@ topics:
     theory_id: 9536
   - title: External resources
     theory_id: 6216
-  - title: Frameworks
-    theory_id: 6701
   - title: Data and object mapping
     theory_id: 8262
   - title: Libraries
     theory_id: 8504
+  - title: Frameworks
+    theory_id: 6701
   - title: Object-Relational Mapping (ORM)
     theory_id: 8312
   - title: Dependency management
