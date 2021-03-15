@@ -3,7 +3,6 @@ package splitter.command;
 import splitter.controller.Controller;
 import splitter.model.Person;
 import splitter.model.Transaction;
-import splitter.service.TransactionService;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -31,10 +30,8 @@ public class BalanceCommand implements Command {
         }
 
         Map<Person, Map<Person, BigDecimal>> forDate = new TreeMap<>();
-        for (Transaction record : TransactionService.getTransactions()) {
-            if (record.getDate().isAfter(operationDate)) {
-                continue;
-            }
+        for (Transaction record :
+                controller.getTransactionService().getByDateBeforOrEquals(operationDate)) {
 
             Map<Person, BigDecimal> debts = forDate.computeIfAbsent(
                     record.getCreditor(), k -> new TreeMap<>());

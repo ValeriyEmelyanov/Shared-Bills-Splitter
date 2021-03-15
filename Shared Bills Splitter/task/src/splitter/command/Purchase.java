@@ -3,7 +3,6 @@ package splitter.command;
 import splitter.controller.Controller;
 import splitter.model.Person;
 import splitter.model.Transaction;
-import splitter.service.GroupService;
 import splitter.service.TransactionService;
 
 import java.math.BigDecimal;
@@ -25,8 +24,8 @@ public class Purchase implements Command {
             return;
         }
 
-        Optional<Set<Person>> optionalMembers =
-                GroupService.groupMembersFromArgumentGroup(argumentGroup);
+        Optional<Set<Person>> optionalMembers = controller
+                .getGroupService().groupMembersFromArgumentGroup(argumentGroup, controller.getPersonService());
         if (optionalMembers.isEmpty()) {
             controller.getView().printInvalidCommandArguments();
             return;
@@ -40,20 +39,23 @@ public class Purchase implements Command {
         }
 
         BigDecimal sum;
-        Person funder;
         try {
             sum = new BigDecimal(commandArguments[commandArguments.length - 1])
                     .setScale(2, RoundingMode.UNNECESSARY);
-            funder = new Person(commandArguments[0]);
         } catch (Exception e) {
             controller.getView().printInvalidCommandArguments();
             return;
         }
 
+        Person funder = controller
+                .getPersonService()
+                .getByNameOrCreate(commandArguments[0]);
+
         Map<Person, BigDecimal> distribution = getDistribution(funder, members,
                 sum, BigDecimal.valueOf(intDivisor));
 
-        createTransactions(controller.getOperationDate(), funder, distribution);
+        createTransactions(controller.getTransactionService(),
+                controller.getOperationDate(), funder, distribution);
     }
 
     private Map<Person, BigDecimal> getDistribution(
@@ -86,12 +88,15 @@ public class Purchase implements Command {
         return distribution;
     }
 
-    private void createTransactions(LocalDate operationDate, Person funder, Map<Person, BigDecimal> distribution) {
+    private void createTransactions(TransactionService transactionService,
+                                    LocalDate operationDate,
+                                    Person funder,
+                                    Map<Person, BigDecimal> distribution) {
         for (Map.Entry<Person, BigDecimal> entry : distribution.entrySet()) {
             if (funder.equals(entry.getKey())) {
                 continue;
             }
-            TransactionService.add(new Transaction(
+            transactionService.create(new Transaction(
                     operationDate,
                     funder,
                     entry.getKey(),

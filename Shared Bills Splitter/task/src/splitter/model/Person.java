@@ -1,9 +1,26 @@
 package splitter.model;
 
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
 import java.util.Objects;
 
+@Entity
+@Table(name = "person")
 public class Person implements Comparable<Person> {
-    private final String name;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    Long id;
+
+    @Column(name = "name")
+    private String name;
+
+    public Person() {
+    }
 
     public Person(String name) {
         this.name = name;
@@ -11,6 +28,10 @@ public class Person implements Comparable<Person> {
 
     public String getName() {
         return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
     @Override

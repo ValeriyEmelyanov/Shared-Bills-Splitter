@@ -1,37 +1,60 @@
 package splitter.model;
 
-import java.util.Collection;
-import java.util.Collections;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.FetchType;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.JoinTable;
+import javax.persistence.ManyToMany;
+import javax.persistence.Table;
 import java.util.Set;
-import java.util.TreeSet;
 
+@Entity
+@Table(name = "groupp")
 public class Group {
-    private final Set<Person> members = new TreeSet<>();
-    private final String name;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    Long id;
+
+    @Column(name = "name")
+    private String name;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable
+    private Set<Person> members;
+
+    public Group() {
+    }
 
     public Group(String name, Set<Person> members) {
         this.name = name;
-        this.members.addAll(members);
+        this.members = members;
     }
 
-    public Group(String name, Person... persons) {
-        this.name = name;
-        this.members.addAll(Set.of(persons));
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public String getName() {
         return name;
     }
 
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setMembers(Set<Person> members) {
+        this.members = members;
+    }
+
     public Set<Person> getMembers() {
-        return Collections.unmodifiableSet(members);
-    }
-
-    public void addAll(Collection<Person> newMembers) {
-        members.addAll(newMembers);
-    }
-
-    public void removeAll(Collection<Person> toRemove) {
-        members.removeAll(toRemove);
+        return members;
     }
 }

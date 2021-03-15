@@ -3,7 +3,7 @@ hyperskill_project:
   ide_files: https://stepik.org/media/attachments/lesson/452671/additional_files.json
   is_template_based: false
   use_ide: true
-update_date: Wed, 10 Mar 2021 13:05:14 UTC
+update_date: Mon, 15 Mar 2021 10:10:27 UTC
 stages:
 - id: 765
   step: 11718
@@ -25,8 +25,6 @@ stages:
   is_completed: false
 topics:
   0:
-  - title: Introduction to Scala
-    theory_id: 8945
   - title: Immutability
     theory_id: 7929
   - title: Units of information
@@ -111,8 +109,18 @@ topics:
     theory_id: 3507
   - title: Switch statement
     theory_id: 3504
-  - title: Introduction to Kotlin
-    theory_id: 4350
+  - title: Write, compile, and run
+    theory_id: 3739
+  - title: JVM, JRE, and JDK
+    theory_id: 3499
+  - title: Errors in programs
+    theory_id: 3536
+  - title: What is an exception
+    theory_id: 3497
+  - title: NPE
+    theory_id: 1945
+  - title: Build tools
+    theory_id: 4284
   - title: Sizes and ranges
     theory_id: 3532
   - title: Type casting
@@ -141,22 +149,10 @@ topics:
     theory_id: 3551
   - title: Final variables
     theory_id: 7427
-  - title: Write, compile, and run
-    theory_id: 3739
-  - title: JVM, JRE, and JDK
-    theory_id: 3499
-  - title: Errors in programs
-    theory_id: 3536
-  - title: What is an exception
-    theory_id: 3497
   - title: Hierarchy of exceptions
     theory_id: 3570
   - title: Exception handling
     theory_id: 3552
-  - title: NPE
-    theory_id: 1945
-  - title: Build tools
-    theory_id: 4284
   - title: Java Archive
     theory_id: 4311
   - title: Gradle basics
@@ -177,16 +173,16 @@ topics:
     theory_id: 3549
   - title: Introduction to generic programming
     theory_id: 3492
-  - title: What are collections
-    theory_id: 3770
-  - title: ArrayList
-    theory_id: 3567
   - title: Lambda expressions
     theory_id: 11635
   - title: Method references
     theory_id: 3620
   - title: Functional interfaces
     theory_id: 11636
+  - title: What are collections
+    theory_id: 3770
+  - title: ArrayList
+    theory_id: 3567
   - title: Standard functional interfaces
     theory_id: 3623
   - title: Defining classes
@@ -215,6 +211,8 @@ topics:
     theory_id: 3622
   - title: Objects
     theory_id: 4727
+  - title: Boxing and unboxing
+    theory_id: 3595
   - title: Static members
     theory_id: 3534
   - title: Initialization blocks
@@ -235,8 +233,6 @@ topics:
     theory_id: 3564
   - title: Enums in Java
     theory_id: 11514
-  - title: Boxing and unboxing
-    theory_id: 3595
   1:
   - title: Regexps basics
     theory_id: 7580
@@ -270,18 +266,18 @@ topics:
   3:
   - title: Introduction to Spring boot
     theory_id: 7944
-  - title: SELECT FROM WHERE statement
-    theory_id: 8619
-  - title: Aggregate functions
-    theory_id: 9611
-  - title: GROUP BY statement
-    theory_id: 9908
   - title: Getting started with Spring Boot
     theory_id: 6336
   - title: Basic project structure
     theory_id: 6339
   - title: Beans and components
     theory_id: 7353
+  - title: SELECT FROM WHERE statement
+    theory_id: 8619
+  - title: Aggregate functions
+    theory_id: 9611
+  - title: GROUP BY statement
+    theory_id: 9908
   - title: H2 database
     theory_id: 8762
   - title: Introduction to JPA
@@ -298,10 +294,10 @@ topics:
     theory_id: 8504
   - title: Frameworks
     theory_id: 6701
-  - title: Object-Relational Mapping (ORM)
-    theory_id: 8312
   - title: Dependency management
     theory_id: 5076
+  - title: Object-Relational Mapping (ORM)
+    theory_id: 8312
   - title: Random
     theory_id: 4910
   4:
@@ -311,8 +307,6 @@ topics:
     theory_id: 9831
   - title: Hash table
     theory_id: 5364
-  - title: The Map interface
-    theory_id: 3558
   - title: Function composition
     theory_id: 3580
   - title: Functional data processing with streams
@@ -333,6 +327,8 @@ topics:
     theory_id: 10180
   - title: Stream pipelines
     theory_id: 3612
+  - title: The Map interface
+    theory_id: 3558
   - title: Grouping collectors
     theory_id: 10512
   5:

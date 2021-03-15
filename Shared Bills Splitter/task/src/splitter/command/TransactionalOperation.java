@@ -3,8 +3,6 @@ package splitter.command;
 import splitter.controller.Controller;
 import splitter.model.Person;
 import splitter.model.Transaction;
-import splitter.service.PersonService;
-import splitter.service.TransactionService;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -29,14 +27,18 @@ public class TransactionalOperation {
             return;
         }
 
-        Person from = PersonService.getByName(arguments[fromIndex]);
-        Person to = PersonService.getByName(arguments[toIndex]);
+        Person from = controller
+                .getPersonService()
+                .getByNameOrCreate(arguments[fromIndex]);
+        Person to = controller
+                .getPersonService()
+                .getByNameOrCreate(arguments[toIndex]);
         if (from.equals(to)) {
             controller.getView().printInvalidCommandArguments();
             return;
         }
 
-        TransactionService.add(
+        controller.getTransactionService().create(
                 new Transaction(controller.getOperationDate(), from, to, sum));
     }
 }

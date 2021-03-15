@@ -3,7 +3,6 @@ package splitter.command;
 import splitter.controller.Controller;
 import splitter.model.Group;
 import splitter.model.Person;
-import splitter.service.GroupService;
 
 import java.util.Optional;
 import java.util.Set;
@@ -33,7 +32,7 @@ public class GroupCommand implements Command {
 
         Group group = null;
         if (groupMode != GroupMode.CREATE) {
-            Optional<Group> optionalGroup = GroupService.getByName(groupName);
+            Optional<Group> optionalGroup = controller.getGroupService().getByName(groupName);
             if (optionalGroup.isEmpty()) {
                 controller.getView().printUnknownGroup();
                 return;
@@ -60,29 +59,38 @@ public class GroupCommand implements Command {
         }
     }
 
-    private void createGroup(Controller controller, String groupName, String[] argumentGroup) {
-        Optional<Set<Person>> optionalMembers =
-                GroupService.groupMembersFromArgumentGroup(argumentGroup);
+    private void createGroup(Controller controller,
+                             String groupName,
+                             String[] argumentGroup) {
+        Optional<Set<Person>> optionalMembers = controller
+                .getGroupService()
+                .groupMembersFromArgumentGroup(argumentGroup,
+                        controller.getPersonService());
         if (optionalMembers.isEmpty()) {
             controller.getView().printInvalidCommandArguments();
             return;
         }
 
-        GroupService.put(new Group(groupName, optionalMembers.get()));
+        controller.getGroupService().create(
+                new Group(groupName, optionalMembers.get()));
     }
 
-    private void changeGroupStructure(Controller controller, Group group, String[] argumentGroup,
+    private void changeGroupStructure(Controller controller,
+                                      Group group,
+                                      String[] argumentGroup,
                                       boolean isAdding) {
-        Optional<Set<Person>> optionalSet = GroupService.groupMembersFromArgumentGroup(argumentGroup);
+        Optional<Set<Person>> optionalSet = controller
+                .getGroupService()
+                .groupMembersFromArgumentGroup(argumentGroup, controller.getPersonService());
         if (optionalSet.isEmpty()) {
             controller.getView().printInvalidCommandArguments();
             return;
         }
 
         if (isAdding) {
-            group.addAll(optionalSet.get());
+            controller.getGroupService().addAll(group, optionalSet.get());
         } else {
-            group.removeAll(optionalSet.get());
+            controller.getGroupService().removeAll(group, optionalSet.get());
         }
     }
 

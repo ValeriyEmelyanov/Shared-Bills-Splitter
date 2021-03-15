@@ -1,7 +1,11 @@
 package splitter.controller;
 
+import org.springframework.stereotype.Component;
 import splitter.command.Command;
 import splitter.command.MenuCommand;
+import splitter.service.GroupService;
+import splitter.service.PersonService;
+import splitter.service.TransactionService;
 import splitter.view.ConsoleView;
 
 import java.time.LocalDate;
@@ -11,21 +15,45 @@ import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@Component
 public class Controller {
+
     private final Scanner scanner;
     private final ConsoleView view;
     private final Pattern pattern;
     private final DateTimeFormatter formatter;
 
+    private final PersonService personService;
+    private final GroupService groupService;
+    private final TransactionService transactionService;
+
     private LocalDate operationDate;
     private String[] operationArguments;
     private String[] argumentGroup;
 
-    public Controller() {
+    public Controller(PersonService personService,
+                      GroupService groupService,
+                      TransactionService transactionService) {
+        this.personService = personService;
+        this.groupService = groupService;
+        this.transactionService = transactionService;
+
         this.scanner = new Scanner(System.in);
         this.view = new ConsoleView();
         this.pattern = Pattern.compile("\\(.*\\)");
         this.formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+    }
+
+    public PersonService getPersonService() {
+        return personService;
+    }
+
+    public GroupService getGroupService() {
+        return groupService;
+    }
+
+    public TransactionService getTransactionService() {
+        return transactionService;
     }
 
     public ConsoleView getView() {

@@ -1,28 +1,24 @@
 package splitter.service;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 import splitter.model.Person;
+import splitter.repository.PersonRepository;
 
-import java.util.HashSet;
 import java.util.Optional;
-import java.util.Set;
 
+@Component
 public class PersonService {
-    private static final Set<Person> PEOPLE = new HashSet<>();
 
-    private PersonService() {
+    private final PersonRepository personRepository;
+
+    @Autowired
+    public PersonService(PersonRepository personRepository) {
+        this.personRepository = personRepository;
     }
 
-    public static Person getByName(String name) {
-        Optional<Person> optionalPerson = PEOPLE.stream()
-                .filter(p -> p.getName().equals(name))
-                .findFirst();
-
-        if (optionalPerson.isPresent()) {
-            return optionalPerson.get();
-        }
-
-        Person person = new Person(name);
-        PEOPLE.add(person);
-        return person;
+    public Person getByNameOrCreate(String name) {
+        Optional<Person> optionalPerson = personRepository.findByName(name);
+        return optionalPerson.orElseGet(() -> personRepository.save(new Person(name)));
     }
 }

@@ -1,22 +1,28 @@
 package splitter.service;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 import splitter.model.Transaction;
+import splitter.repository.TransactionRepository;
 
-import java.util.ArrayList;
-import java.util.Collections;
+import java.time.LocalDate;
 import java.util.List;
 
+@Component
 public class TransactionService {
-    private static final List<Transaction> TRANSACTIONS = new ArrayList<>();
 
-    private TransactionService() {
+    private final TransactionRepository transactionRepository;
+
+    @Autowired
+    private TransactionService(TransactionRepository transactionRepository) {
+        this.transactionRepository = transactionRepository;
     }
 
-    public static List<Transaction> getTransactions() {
-        return Collections.unmodifiableList(TRANSACTIONS);
+    public List<Transaction> getByDateBeforOrEquals(LocalDate date) {
+        return transactionRepository.findAllByDateIsLessThanEqualOrderByDate(date);
     }
 
-    public static void add(Transaction record) {
-        TRANSACTIONS.add(record);
+    public void create(Transaction transaction) {
+        transactionRepository.save(transaction);
     }
 }
