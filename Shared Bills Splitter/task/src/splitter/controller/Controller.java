@@ -1,5 +1,6 @@
 package splitter.controller;
 
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import splitter.command.Command;
 import splitter.command.MenuCommand;
@@ -16,7 +17,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
-public class Controller {
+public class Controller implements CommandLineRunner {
     private final Scanner scanner;
     private final ConsoleView view;
     private final Pattern pattern;
@@ -69,7 +70,8 @@ public class Controller {
         return argumentGroup;
     }
 
-    public void run() {
+    @Override
+    public void run(String... args) throws Exception {
         String commandLine;
         while (!(commandLine = scanner.nextLine()).equalsIgnoreCase("exit")) {
             String commandName;

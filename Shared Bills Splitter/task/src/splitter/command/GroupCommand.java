@@ -99,6 +99,7 @@ public class GroupCommand implements Command {
         controller.getView().printList(
                 members.stream()
                         .map(Person::getName)
+                        .sorted()
                         .collect(Collectors.toList()));
     }
 
