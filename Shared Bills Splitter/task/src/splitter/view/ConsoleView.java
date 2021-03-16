@@ -3,6 +3,7 @@ package splitter.view;
 import splitter.command.MenuCommand;
 
 import java.util.List;
+import java.util.Map;
 
 public class ConsoleView {
     public void printCommandList() {
@@ -33,5 +34,15 @@ public class ConsoleView {
 
     public void printUnknownGroup() {
         System.out.println("Unknown group");
+    }
+
+    public void printGifting(String from, String to) {
+        System.out.printf("%s gift to %s\n", from, to);
+    }
+
+    public void printGiftingPairs(Map<String, String> pairs) {
+        for (Map.Entry<String, String> pair : pairs.entrySet()) {
+            printGifting(pair.getKey(), pair.getValue());
+        }
     }
 }

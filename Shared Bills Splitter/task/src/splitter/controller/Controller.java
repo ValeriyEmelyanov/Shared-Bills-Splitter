@@ -6,10 +6,10 @@ import splitter.command.MenuCommand;
 import splitter.service.GroupService;
 import splitter.service.PersonService;
 import splitter.service.TransactionService;
+import splitter.util.Util;
 import splitter.view.ConsoleView;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Scanner;
 import java.util.regex.Matcher;
@@ -17,11 +17,9 @@ import java.util.regex.Pattern;
 
 @Component
 public class Controller {
-
     private final Scanner scanner;
     private final ConsoleView view;
     private final Pattern pattern;
-    private final DateTimeFormatter formatter;
 
     private final PersonService personService;
     private final GroupService groupService;
@@ -41,7 +39,6 @@ public class Controller {
         this.scanner = new Scanner(System.in);
         this.view = new ConsoleView();
         this.pattern = Pattern.compile("\\(.*\\)");
-        this.formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd");
     }
 
     public PersonService getPersonService() {
@@ -136,7 +133,7 @@ public class Controller {
         if (commandLine.length() > 10) {
             String maybeDate = commandLine.substring(0, 10);
             if (maybeDate.matches("\\d{4}\\.\\d{2}\\.\\d{2}")) {
-                operationDate = LocalDate.parse(maybeDate, formatter);
+                operationDate = LocalDate.parse(maybeDate, Util.FORMATTER);
                 return commandLine.substring(11).trim();
             }
         }

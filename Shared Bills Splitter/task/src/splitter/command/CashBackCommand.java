@@ -10,8 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-public class Purchase implements Command {
-
+public class CashBackCommand implements Command {
     @Override
     public void execute(Controller controller) {
         String[] commandArguments = controller.getOperationArguments();
@@ -44,14 +43,14 @@ public class Purchase implements Command {
             return;
         }
 
-        Person funder = controller
+        Person recipient = controller
                 .getPersonService()
                 .getByNameOrCreate(commandArguments[0]);
 
         Map<Person, BigDecimal> distribution = CalculationUtil.getDistribution(
-                funder, members, sum, BigDecimal.valueOf(intDivisor));
+                recipient, members, sum, BigDecimal.valueOf(intDivisor));
 
         controller.getTransactionService().createTransactionsFromDistribution(
-                controller.getOperationDate(), funder, distribution);
+                controller.getOperationDate(), distribution, recipient);
     }
 }

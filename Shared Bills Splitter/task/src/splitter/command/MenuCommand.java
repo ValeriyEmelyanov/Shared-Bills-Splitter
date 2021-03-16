@@ -5,11 +5,14 @@ import splitter.controller.Controller;
 public enum MenuCommand implements Command {
     BALANCE(new BalanceCommand()),
     BORROW(new BorrowCommand()),
+    CASHBACK(new CashBackCommand()),
     EXIT(null),
     GROUP(new GroupCommand()),
     HELP(new HelpCommand()),
     PURCHASE(new Purchase()),
-    REPAY(new RepayCommand());
+    REPAY(new RepayCommand()),
+    SECRETSANTA(new SecretSantaCommand()),
+    WRITEOFF(new WriteOffCommand());
 
     private final Command command;
 

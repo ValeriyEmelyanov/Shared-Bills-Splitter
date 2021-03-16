@@ -1172,6 +1172,148 @@ files:
         }
     }
   learner_created: true
+- name: src/splitter/command/HelpCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public class HelpCommand implements Command {
+        @Override
+        public void execute(Controller controller) {
+            controller.getView().printCommandList();
+        }
+    }
+  learner_created: true
+- name: src/splitter/service/TransactionService.java
+  visible: true
+  text: |
+    package splitter.service;
+
+    import splitter.model.Transaction;
+
+    import java.util.ArrayList;
+    import java.util.Collections;
+    import java.util.List;
+
+    public class TransactionService {
+        private static final List<Transaction> TRANSACTIONS = new ArrayList<>();
+
+        private TransactionService() {
+        }
+
+        public static List<Transaction> getTransactions() {
+            return Collections.unmodifiableList(TRANSACTIONS);
+        }
+
+        public static void add(Transaction record) {
+            TRANSACTIONS.add(record);
+        }
+    }
+  learner_created: true
+- name: src/splitter/view/ConsoleView.java
+  visible: true
+  text: |
+    package splitter.view;
+
+    import splitter.command.MenuCommand;
+
+    import java.util.List;
+
+    public class ConsoleView {
+        public void printCommandList() {
+            for (MenuCommand menuCommand : MenuCommand.values()) {
+                System.out.println(menuCommand.name().toLowerCase());
+            }
+        }
+
+        public void printUnknownCommand() {
+            System.out.println("Unknown command. Print help to show commands list");
+        }
+
+        public void printInvalidCommandArguments() {
+            System.out.println("Illegal command arguments");
+        }
+
+        public void printBalance(List<String> balance) {
+            if (balance.isEmpty()) {
+                System.out.println("No repayments need");
+            } else {
+                balance.forEach(System.out::println);
+            }
+        }
+
+        public void printList(List<String> list) {
+            list.forEach(System.out::println);
+        }
+
+        public void printUnknownGroup() {
+            System.out.println("Unknown group");
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/MenuCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public enum MenuCommand implements Command {
+        BALANCE(new BalanceCommand()),
+        BORROW(new BorrowCommand()),
+        EXIT(null),
+        GROUP(new GroupCommand()),
+        HELP(new HelpCommand()),
+        PURCHASE(new Purchase()),
+        REPAY(new RepayCommand());
+
+        private final Command command;
+
+        MenuCommand(Command command) {
+            this.command = command;
+        }
+
+        @Override
+        public void execute(Controller controller) {
+            if (command == null) {
+                return;
+            }
+            command.execute(controller);
+        }
+    }
+  learner_created: true
+- name: build.gradle
+  visible: true
+  learner_created: true
+- name: src/resources/application.properties
+  visible: true
+  learner_created: true
+- name: src/splitter/repository/GroupRepository.java
+  visible: true
+  learner_created: true
+- name: src/splitter/repository/PersonRepository.java
+  visible: true
+  learner_created: true
+- name: src/splitter/repository/TransactionRepository.java
+  visible: true
+  learner_created: true
+- name: src/splitter/command/CashBackCommand.java
+  visible: true
+  learner_created: true
+- name: src/splitter/command/SecretSantaCommand.java
+  visible: true
+  learner_created: true
+- name: src/splitter/command/WriteOffCommand.java
+  visible: true
+  learner_created: true
+- name: src/splitter/util/Util.java
+  visible: true
+  learner_created: true
+- name: src/splitter/util/CalculationUtil.java
+  visible: true
+  learner_created: true
 - name: src/splitter/controller/Controller.java
   visible: true
   text: |
@@ -1317,133 +1459,41 @@ files:
         }
     }
   learner_created: true
-- name: src/splitter/command/HelpCommand.java
-  visible: true
-  text: |
-    package splitter.command;
-
-    import splitter.controller.Controller;
-
-    public class HelpCommand implements Command {
-        @Override
-        public void execute(Controller controller) {
-            controller.getView().printCommandList();
-        }
-    }
-  learner_created: true
-- name: src/splitter/service/TransactionService.java
-  visible: true
-  text: |
-    package splitter.service;
-
-    import splitter.model.Transaction;
-
-    import java.util.ArrayList;
-    import java.util.Collections;
-    import java.util.List;
-
-    public class TransactionService {
-        private static final List<Transaction> TRANSACTIONS = new ArrayList<>();
-
-        private TransactionService() {
-        }
-
-        public static List<Transaction> getTransactions() {
-            return Collections.unmodifiableList(TRANSACTIONS);
-        }
-
-        public static void add(Transaction record) {
-            TRANSACTIONS.add(record);
-        }
-    }
-  learner_created: true
-- name: src/splitter/view/ConsoleView.java
-  visible: true
-  text: |
-    package splitter.view;
-
-    import splitter.command.MenuCommand;
-
-    import java.util.List;
-
-    public class ConsoleView {
-        public void printCommandList() {
-            for (MenuCommand menuCommand : MenuCommand.values()) {
-                System.out.println(menuCommand.name().toLowerCase());
-            }
-        }
-
-        public void printUnknownCommand() {
-            System.out.println("Unknown command. Print help to show commands list");
-        }
-
-        public void printInvalidCommandArguments() {
-            System.out.println("Illegal command arguments");
-        }
-
-        public void printBalance(List<String> balance) {
-            if (balance.isEmpty()) {
-                System.out.println("No repayments need");
-            } else {
-                balance.forEach(System.out::println);
-            }
-        }
-
-        public void printList(List<String> list) {
-            list.forEach(System.out::println);
-        }
-
-        public void printUnknownGroup() {
-            System.out.println("Unknown group");
-        }
-    }
-  learner_created: true
-- name: src/splitter/command/MenuCommand.java
-  visible: true
-  text: |
-    package splitter.command;
-
-    import splitter.controller.Controller;
-
-    public enum MenuCommand implements Command {
-        BALANCE(new BalanceCommand()),
-        BORROW(new BorrowCommand()),
-        EXIT(null),
-        GROUP(new GroupCommand()),
-        HELP(new HelpCommand()),
-        PURCHASE(new Purchase()),
-        REPAY(new RepayCommand());
-
-        private final Command command;
-
-        MenuCommand(Command command) {
-            this.command = command;
-        }
-
-        @Override
-        public void execute(Controller controller) {
-            if (command == null) {
-                return;
-            }
-            command.execute(controller);
-        }
-    }
-  learner_created: true
-- name: build.gradle
-  visible: true
-  learner_created: true
-- name: src/resources/application.properties
-  visible: true
-  learner_created: true
-- name: src/splitter/repository/GroupRepository.java
-  visible: true
-  learner_created: true
-- name: src/splitter/repository/PersonRepository.java
-  visible: true
-  learner_created: true
-- name: src/splitter/repository/TransactionRepository.java
-  visible: true
-  learner_created: true
 feedback_link: https://hyperskill.org/projects/142/stages/768/implement#comment
-status: Unchecked
+status: Failed
+feedback:
+  message: "Exception in test #1\n\norg.springframework.beans.factory.UnsatisfiedDependencyException:\
+    \ Error creating bean with name &#39;main&#39;: Unsatisfied dependency expressed\
+    \ through field &#39;controller&#39;; nested exception is org.springframework.beans.factory.NoSuchBeanDefinitionException:\
+    \ No qualifying bean of type &#39;splitter.controller.Controller&#39; available:\
+    \ expected at least 1 bean which qualifies as autowire candidate. Dependency annotations:\
+    \ {@org.springframework.beans.factory.annotation.Autowired(required=true)}\r\n\
+    \tat org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor$AutowiredFieldElement.inject(AutowiredAnnotationBeanPostProcessor.java:643)\r\
+    \n\tat org.springframework.beans.factory.annotation.InjectionMetadata.inject(InjectionMetadata.java:116)\r\
+    \n\tat org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor.postProcessProperties(AutowiredAnnotationBeanPostProcessor.java:399)\r\
+    \n\tat org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.populateBean(AbstractAutowireCapableBeanFactory.java:1422)\r\
+    \n\tat org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:594)\r\
+    \n\tat org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:517)\r\
+    \n\tat org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:323)\r\
+    \n\tat org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:222)\r\
+    \n\tat org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:321)\r\
+    \n\tat org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:202)\r\
+    \n\tat org.springframework.beans.factory.support.DefaultListableBeanFactory.preInstantiateSingletons(DefaultListableBeanFactory.java:879)\r\
+    \n\tat org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:878)\r\
+    \n\tat org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:550)\r\
+    \n\tat org.springframework.boot.SpringApplication.refresh(SpringApplication.java:747)\r\
+    \n\tat org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:397)\r\
+    \n\tat org.springframework.boot.SpringApplication.run(SpringApplication.java:315)\r\
+    \n\tat org.springframework.boot.SpringApplication.run(SpringApplication.java:1226)\r\
+    \n\tat org.springframework.boot.SpringApplication.run(SpringApplication.java:1215)\r\
+    \n\tat splitter.Main.main(Main.java:17)\n\nPlease find below the output of your\
+    \ program during this failed test.\n\n---\n\n2021-03-16 14:11:11.744 ERROR 8120\
+    \ --- [           Main] o.s.b.d.LoggingFailureAnalysisReporter   : \n\n***************************\n\
+    APPLICATION FAILED TO START\n***************************\n\nDescription:\n\nField\
+    \ controller in splitter.Main required a bean of type &#39;splitter.controller.Controller&#39;\
+    \ that could not be found.\n\nThe injection point has the following annotations:\n\
+    \t- @org.springframework.beans.factory.annotation.Autowired(required=true)\n\n\
+    \nAction:\n\nConsider defining a bean of type &#39;splitter.controller.Controller&#39;\
+    \ in your configuration."
+  time: Tue, 16 Mar 2021 11:11:12 UTC
 record: -1

@@ -12,4 +12,5 @@ public interface TransactionRepository extends CrudRepository<Transaction, Long>
 
     List<Transaction> findAllByDateIsLessThanEqualOrderByDate(LocalDate date);
 
+    void deleteAllByDateBefore(LocalDate date);
 }

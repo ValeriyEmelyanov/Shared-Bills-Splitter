@@ -6,10 +6,8 @@ import splitter.model.Transaction;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.format.DateTimeFormatter;
 
 public class TransactionalOperation {
-    private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy.MM.dd");
 
     protected void move(Controller controller, int fromIndex, int toIndex) {
         String[] arguments = controller.getOperationArguments();
