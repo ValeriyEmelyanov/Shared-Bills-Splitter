@@ -10,6 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 
 public class BalanceCommand implements Command {
@@ -18,9 +20,7 @@ public class BalanceCommand implements Command {
     public void execute(Controller controller) {
         String[] arguments = controller.getOperationArguments();
 
-        BalanceMode mode = null;
-
-        mode = arguments.length == 1
+        BalanceMode mode = arguments.length == 1
                 ? BalanceMode.valueOf(arguments[0].toUpperCase(Locale.ROOT))
                 : BalanceMode.CLOSE;
 
@@ -44,10 +44,25 @@ public class BalanceCommand implements Command {
                     debts.getOrDefault(record.getCreditor(), BigDecimal.ZERO).add(record.getSum()));
         }
 
+        String[] argumentGroup = controller.getArgumentGroup();
+        Set<Person> people;
+        if (argumentGroup.length > 0) {
+            Optional<Set<Person>> optionalPeople = controller
+                    .getGroupService()
+                    .groupMembersFromArgumentGroup(
+                            argumentGroup, controller.getPersonService());
+            people = optionalPeople.orElse(Set.of());
+        } else {
+            people = Set.of();
+        }
+
         List<String> balance = new ArrayList<>();
         for (Map.Entry<Person, Map<Person, BigDecimal>> debtsEntry : forDate.entrySet()) {
             for (Map.Entry<Person, BigDecimal> entry : debtsEntry.getValue().entrySet()) {
                 if (entry.getValue().compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+                if (!people.isEmpty() && !people.contains(debtsEntry.getKey())) {
                     continue;
                 }
                 balance.add(String.format("%s owes %s %s",

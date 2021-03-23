@@ -18,20 +18,12 @@ public class CalculationUtil {
         BigDecimal portion = sum.divide(divisor, RoundingMode.FLOOR);
 
         Map<Person, BigDecimal> distribution = new TreeMap<>();
-        for (Person p : members) {
-            if (p.equals(funder)) {
-                continue;
-            }
-            distribution.put(p, portion);
-        }
+        members.forEach(p -> distribution.put(p, portion));
 
         BigDecimal remainder = sum.subtract(portion.multiply(divisor));
         if (remainder.compareTo(BigDecimal.ZERO) != 0) {
             BigDecimal increment = new BigDecimal("0.01");
             for (Map.Entry<Person, BigDecimal> entry : distribution.entrySet()) {
-                if (entry.getKey().equals(funder)) {
-                    continue;
-                }
                 distribution.put(entry.getKey(), entry.getValue().add(increment));
                 remainder = remainder.subtract(increment);
                 if (remainder.compareTo(BigDecimal.ZERO) == 0) {
@@ -39,6 +31,8 @@ public class CalculationUtil {
                 }
             }
         }
+        distribution.remove(funder);
+
         return distribution;
     }
 }

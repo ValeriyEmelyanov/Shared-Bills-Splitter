@@ -22,7 +22,9 @@ public class Purchase implements Command {
         }
 
         Optional<Set<Person>> optionalMembers = controller
-                .getGroupService().groupMembersFromArgumentGroup(argumentGroup, controller.getPersonService());
+                .getGroupService()
+                .groupMembersFromArgumentGroup(
+                        argumentGroup, controller.getPersonService());
         if (optionalMembers.isEmpty()) {
             controller.getView().printInvalidCommandArguments();
             return;
