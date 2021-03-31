@@ -51,4 +51,12 @@ public class Person implements Comparable<Person> {
     public int compareTo(Person person) {
         return name.compareTo(person.getName());
     }
+
+    @Override
+    public String toString() {
+        return "Person{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                '}';
+    }
 }

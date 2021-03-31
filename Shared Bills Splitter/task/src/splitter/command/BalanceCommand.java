@@ -18,6 +18,12 @@ public class BalanceCommand implements Command {
 
     @Override
     public void execute(Controller controller) {
+        Map<Person, Map<Person, BigDecimal>> balanceMap = getBalanceMap(controller);
+        List<String> balanceList = getBalanceList(balanceMap);
+        controller.getView().printBalance(balanceList);
+    }
+
+    protected Map<Person, Map<Person, BigDecimal>> getBalanceMap(Controller controller) {
         String[] arguments = controller.getOperationArguments();
 
         BalanceMode mode = arguments.length == 1
@@ -56,8 +62,9 @@ public class BalanceCommand implements Command {
             people = Set.of();
         }
 
-        List<String> balance = new ArrayList<>();
+        Map<Person, Map<Person, BigDecimal>> filteredForDate = new TreeMap<>();
         for (Map.Entry<Person, Map<Person, BigDecimal>> debtsEntry : forDate.entrySet()) {
+            Map<Person, BigDecimal> debts = new TreeMap<>();
             for (Map.Entry<Person, BigDecimal> entry : debtsEntry.getValue().entrySet()) {
                 if (entry.getValue().compareTo(BigDecimal.ZERO) <= 0) {
                     continue;
@@ -65,14 +72,27 @@ public class BalanceCommand implements Command {
                 if (!people.isEmpty() && !people.contains(debtsEntry.getKey())) {
                     continue;
                 }
-                balance.add(String.format("%s owes %s %s",
-                        debtsEntry.getKey().getName(),
-                        entry.getKey().getName(),
-                        entry.getValue().toString()));
+                debts.put(entry.getKey(), entry.getValue());
+            }
+            if (!debts.isEmpty()) {
+                filteredForDate.put(debtsEntry.getKey(), debts);
             }
         }
 
-        controller.getView().printBalance(balance);
+        return filteredForDate;
+    }
+
+    private List<String> getBalanceList(Map<Person, Map<Person, BigDecimal>> balanceMap) {
+        List<String> balanceList = new ArrayList<>();
+        for (Map.Entry<Person, Map<Person, BigDecimal>> from : balanceMap.entrySet()) {
+            for (Map.Entry<Person, BigDecimal> to : from.getValue().entrySet()) {
+                balanceList.add(String.format("%s owes %s %s",
+                        from.getKey().getName(),
+                        to.getKey().getName(),
+                        to.getValue().toString()));
+            }
+        }
+        return balanceList;
     }
 }
 

@@ -4,6 +4,7 @@ import splitter.controller.Controller;
 
 public enum MenuCommand implements Command {
     BALANCE(new BalanceCommand()),
+    BALANCEPERFECT(new BalancePerfectCommand()),
     BORROW(new BorrowCommand()),
     CASHBACK(new CashBackCommand()),
     EXIT(null),

@@ -737,6 +737,1372 @@ files:
         }
     }
   learner_created: false
+- name: src/splitter/command/BalanceCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+    import splitter.model.Person;
+    import splitter.model.Transaction;
+
+    import java.math.BigDecimal;
+    import java.time.LocalDate;
+    import java.util.ArrayList;
+    import java.util.List;
+    import java.util.Locale;
+    import java.util.Map;
+    import java.util.Optional;
+    import java.util.Set;
+    import java.util.TreeMap;
+
+    public class BalanceCommand implements Command {
+
+        @Override
+        public void execute(Controller controller) {
+            String[] arguments = controller.getOperationArguments();
+
+            BalanceMode mode = arguments.length == 1
+                    ? BalanceMode.valueOf(arguments[0].toUpperCase(Locale.ROOT))
+                    : BalanceMode.CLOSE;
+
+            LocalDate operationDate = controller.getOperationDate();
+            if (mode == BalanceMode.OPEN) {
+                operationDate = operationDate.withDayOfMonth(1).minusDays(1);
+            }
+
+            Map<Person, Map<Person, BigDecimal>> forDate = new TreeMap<>();
+            for (Transaction record :
+                    controller.getTransactionService().getByDateBeforOrEquals(operationDate)) {
+
+                Map<Person, BigDecimal> debts = forDate.computeIfAbsent(
+                        record.getCreditor(), k -> new TreeMap<>());
+                debts.put(record.getDebtor(),
+                        debts.getOrDefault(record.getDebtor(), BigDecimal.ZERO).subtract(record.getSum()));
+
+                debts = forDate.computeIfAbsent(
+                        record.getDebtor(), k -> new TreeMap<>());
+                debts.put(record.getCreditor(),
+                        debts.getOrDefault(record.getCreditor(), BigDecimal.ZERO).add(record.getSum()));
+            }
+
+            String[] argumentGroup = controller.getArgumentGroup();
+            Set<Person> people;
+            if (argumentGroup.length > 0) {
+                Optional<Set<Person>> optionalPeople = controller
+                        .getGroupService()
+                        .groupMembersFromArgumentGroup(
+                                argumentGroup, controller.getPersonService());
+                people = optionalPeople.orElse(Set.of());
+            } else {
+                people = Set.of();
+            }
+
+            List<String> balance = new ArrayList<>();
+            for (Map.Entry<Person, Map<Person, BigDecimal>> debtsEntry : forDate.entrySet()) {
+                for (Map.Entry<Person, BigDecimal> entry : debtsEntry.getValue().entrySet()) {
+                    if (entry.getValue().compareTo(BigDecimal.ZERO) <= 0) {
+                        continue;
+                    }
+                    if (!people.isEmpty() && !people.contains(debtsEntry.getKey())) {
+                        continue;
+                    }
+                    balance.add(String.format("%s owes %s %s",
+                            debtsEntry.getKey().getName(),
+                            entry.getKey().getName(),
+                            entry.getValue().toString()));
+                }
+            }
+
+            controller.getView().printBalance(balance);
+        }
+    }
+
+    enum BalanceMode {
+        OPEN, CLOSE;
+    }
+  learner_created: true
+- name: src/splitter/service/PersonService.java
+  visible: true
+  text: |
+    package splitter.service;
+
+    import org.springframework.beans.factory.annotation.Autowired;
+    import org.springframework.stereotype.Component;
+    import splitter.model.Person;
+    import splitter.repository.PersonRepository;
+
+    import java.util.Optional;
+
+    @Component
+    public class PersonService {
+
+        private final PersonRepository personRepository;
+
+        @Autowired
+        public PersonService(PersonRepository personRepository) {
+            this.personRepository = personRepository;
+        }
+
+        public Person getByNameOrCreate(String name) {
+            Optional<Person> optionalPerson = personRepository.findByName(name);
+            return optionalPerson.orElseGet(() -> personRepository.save(new Person(name)));
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/Command.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public interface Command {
+        void execute(Controller controller);
+    }
+  learner_created: true
+- name: src/splitter/command/WriteOffCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public class WriteOffCommand implements Command {
+        @Override
+        public void execute(Controller controller) {
+            controller
+                    .getTransactionService()
+                    .deleteAllByDateBefore(controller.getOperationDate().plusDays(1));
+        }
+    }
+  learner_created: true
+- name: src/splitter/util/Util.java
+  visible: true
+  text: |
+    package splitter.util;
+
+    import java.time.format.DateTimeFormatter;
+    import java.util.Random;
+
+    public class Util {
+        public static final Random RANDOM = new Random();
+        public static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy.MM.dd");
+
+        private Util() {
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/Purchase.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+    import splitter.model.Person;
+    import splitter.util.CalculationUtil;
+
+    import java.math.BigDecimal;
+    import java.math.RoundingMode;
+    import java.util.Map;
+    import java.util.Optional;
+    import java.util.Set;
+
+    public class Purchase implements Command {
+
+        @Override
+        public void execute(Controller controller) {
+            String[] commandArguments = controller.getOperationArguments();
+            String[] argumentGroup = controller.getArgumentGroup();
+            if (commandArguments.length != 3 || argumentGroup.length < 1) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            Optional<Set<Person>> optionalMembers = controller
+                    .getGroupService()
+                    .groupMembersFromArgumentGroup(
+                            argumentGroup, controller.getPersonService());
+            if (optionalMembers.isEmpty()) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            Set<Person> members = optionalMembers.get();
+            int intDivisor = members.size();
+            if (intDivisor == 0) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            BigDecimal sum;
+            try {
+                sum = new BigDecimal(commandArguments[commandArguments.length - 1])
+                        .setScale(2, RoundingMode.UNNECESSARY);
+            } catch (Exception e) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            Person funder = controller
+                    .getPersonService()
+                    .getByNameOrCreate(commandArguments[0]);
+
+            Map<Person, BigDecimal> distribution = CalculationUtil.getDistribution(
+                    funder, members, sum, BigDecimal.valueOf(intDivisor));
+
+            controller.getTransactionService().createTransactionsFromDistribution(
+                    controller.getOperationDate(), funder, distribution);
+        }
+    }
+  learner_created: true
+- name: src/splitter/model/Person.java
+  visible: true
+  text: |
+    package splitter.model;
+
+    import javax.persistence.Column;
+    import javax.persistence.Entity;
+    import javax.persistence.GeneratedValue;
+    import javax.persistence.GenerationType;
+    import javax.persistence.Id;
+    import javax.persistence.Table;
+    import java.util.Objects;
+
+    @Entity
+    @Table(name = "person")
+    public class Person implements Comparable<Person> {
+
+        @Id
+        @GeneratedValue(strategy = GenerationType.AUTO)
+        Long id;
+
+        @Column(name = "name")
+        private String name;
+
+        public Person() {
+        }
+
+        public Person(String name) {
+            this.name = name;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Person person = (Person) o;
+            return Objects.equals(getName(), person.getName());
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(getName());
+        }
+
+        @Override
+        public int compareTo(Person person) {
+            return name.compareTo(person.getName());
+        }
+    }
+  learner_created: true
+- name: src/splitter/controller/Controller.java
+  visible: true
+  text: |
+    package splitter.controller;
+
+    import org.springframework.boot.CommandLineRunner;
+    import org.springframework.stereotype.Component;
+    import splitter.command.Command;
+    import splitter.command.MenuCommand;
+    import splitter.service.GroupService;
+    import splitter.service.PersonService;
+    import splitter.service.TransactionService;
+    import splitter.util.Util;
+    import splitter.view.ConsoleView;
+
+    import java.time.LocalDate;
+    import java.util.Arrays;
+    import java.util.Scanner;
+    import java.util.regex.Matcher;
+    import java.util.regex.Pattern;
+
+    @Component
+    public class Controller implements CommandLineRunner {
+        private final Scanner scanner;
+        private final ConsoleView view;
+        private final Pattern pattern;
+
+        private final PersonService personService;
+        private final GroupService groupService;
+        private final TransactionService transactionService;
+
+        private LocalDate operationDate;
+        private String[] operationArguments;
+        private String[] argumentGroup;
+
+        public Controller(PersonService personService,
+                          GroupService groupService,
+                          TransactionService transactionService) {
+            this.personService = personService;
+            this.groupService = groupService;
+            this.transactionService = transactionService;
+
+            this.scanner = new Scanner(System.in);
+            this.view = new ConsoleView();
+            this.pattern = Pattern.compile("\\(.*\\)");
+        }
+
+        public PersonService getPersonService() {
+            return personService;
+        }
+
+        public GroupService getGroupService() {
+            return groupService;
+        }
+
+        public TransactionService getTransactionService() {
+            return transactionService;
+        }
+
+        public ConsoleView getView() {
+            return view;
+        }
+
+        public LocalDate getOperationDate() {
+            return operationDate;
+        }
+
+        public String[] getOperationArguments() {
+            return operationArguments;
+        }
+
+        public String[] getArgumentGroup() {
+            return argumentGroup;
+        }
+
+        @Override
+        public void run(String... args) throws Exception {
+            String commandLine;
+            while (!(commandLine = scanner.nextLine()).equalsIgnoreCase("exit")) {
+                String commandName;
+                try {
+                    commandName = parseCommandLine(commandLine);
+                } catch (Exception e) {
+                    view.printInvalidCommandArguments();
+                    continue;
+                }
+                if (commandName == null) {
+                    view.printUnknownCommand();
+                    continue;
+                }
+
+                Command menuCommand;
+                try {
+                    menuCommand = MenuCommand.valueOf(commandName);
+                } catch (IllegalArgumentException e) {
+                    view.printUnknownCommand();
+                    continue;
+                }
+                menuCommand.execute(this);
+            }
+        }
+
+        private String parseCommandLine(String commandLine) {
+            commandLine = extractOperatonDate(commandLine);
+            commandLine = extractArgumentGroup(commandLine);
+
+            String[] commandParts = commandLine.split("\\s+");
+            String commandName = null;
+
+            for (MenuCommand command : MenuCommand.values()) {
+                if (command.name().equals(commandParts[0].toUpperCase())) {
+                    commandName = commandParts[0].toUpperCase();
+                    if (commandParts.length > 1) {
+                        operationArguments = Arrays.copyOfRange(
+                                commandParts, 1, commandParts.length);
+                    } else {
+                        operationArguments = new String[0];
+                    }
+                    break;
+                }
+                if (commandParts.length > 1 &&
+                        command.name().equals(commandParts[1].toUpperCase())) {
+                    commandName = commandParts[1].toUpperCase();
+                    operationArguments = new String[commandParts.length - 1];
+                    operationArguments[0] = commandParts[0];
+                    if (operationArguments.length > 1) {
+                        System.arraycopy(commandParts, 2,
+                                operationArguments, 1, operationArguments.length - 1);
+                    }
+                    break;
+                }
+            }
+
+            return commandName;
+        }
+
+        private String extractOperatonDate(String commandLine) {
+            if (commandLine.length() > 10) {
+                String maybeDate = commandLine.substring(0, 10);
+                if (maybeDate.matches("\\d{4}\\.\\d{2}\\.\\d{2}")) {
+                    operationDate = LocalDate.parse(maybeDate, Util.FORMATTER);
+                    return commandLine.substring(11).trim();
+                }
+            }
+            operationDate = LocalDate.now();
+            return commandLine;
+        }
+
+        private String extractArgumentGroup(String commandLine) {
+            String argGroupLine = null;
+            Matcher matcher = pattern.matcher(commandLine);
+            if (matcher.find()) {
+                argGroupLine = matcher.group(0);
+            }
+
+            if (argGroupLine != null) {
+                commandLine = commandLine.replace(argGroupLine, "");
+                argGroupLine = argGroupLine.replaceAll("[()]", "");
+                argumentGroup = argGroupLine.split(",\\s*");
+                for (int i = 0; i < argumentGroup.length; i++) {
+                    if (argumentGroup[i].startsWith("+")) {
+                        argumentGroup[i] = argumentGroup[i].substring(1);
+                    }
+                }
+            } else {
+                argumentGroup = new String[0];
+            }
+
+            return commandLine;
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/HelpCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public class HelpCommand implements Command {
+        @Override
+        public void execute(Controller controller) {
+            controller.getView().printCommandList();
+        }
+    }
+  learner_created: true
+- name: src/splitter/view/ConsoleView.java
+  visible: true
+  text: |
+    package splitter.view;
+
+    import splitter.command.MenuCommand;
+
+    import java.util.List;
+    import java.util.Map;
+
+    public class ConsoleView {
+        public void printCommandList() {
+            for (MenuCommand menuCommand : MenuCommand.values()) {
+                System.out.println(menuCommand.name().toLowerCase());
+            }
+        }
+
+        public void printUnknownCommand() {
+            System.out.println("Unknown command. Print help to show commands list");
+        }
+
+        public void printInvalidCommandArguments() {
+            System.out.println("Illegal command arguments");
+        }
+
+        public void printBalance(List<String> balance) {
+            if (balance.isEmpty()) {
+                System.out.println("No repayments need");
+            } else {
+                balance.forEach(System.out::println);
+            }
+        }
+
+        public void printList(List<String> list) {
+            list.forEach(System.out::println);
+        }
+
+        public void printUnknownGroup() {
+            System.out.println("Unknown group");
+        }
+
+        public void printGifting(String from, String to) {
+            System.out.printf("%s gift to %s\n", from, to);
+        }
+
+        public void printGiftingPairs(Map<String, String> pairs) {
+            for (Map.Entry<String, String> pair : pairs.entrySet()) {
+                printGifting(pair.getKey(), pair.getValue());
+            }
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/CashBackCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+    import splitter.model.Person;
+    import splitter.util.CalculationUtil;
+
+    import java.math.BigDecimal;
+    import java.math.RoundingMode;
+    import java.util.Map;
+    import java.util.Optional;
+    import java.util.Set;
+
+    public class CashBackCommand implements Command {
+        @Override
+        public void execute(Controller controller) {
+            String[] commandArguments = controller.getOperationArguments();
+            String[] argumentGroup = controller.getArgumentGroup();
+            if (commandArguments.length != 3 || argumentGroup.length < 1) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            Optional<Set<Person>> optionalMembers = controller
+                    .getGroupService().groupMembersFromArgumentGroup(argumentGroup, controller.getPersonService());
+            if (optionalMembers.isEmpty()) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            Set<Person> members = optionalMembers.get();
+            int intDivisor = members.size();
+            if (intDivisor == 0) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            BigDecimal sum;
+            try {
+                sum = new BigDecimal(commandArguments[commandArguments.length - 1])
+                        .setScale(2, RoundingMode.UNNECESSARY);
+            } catch (Exception e) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            Person recipient = controller
+                    .getPersonService()
+                    .getByNameOrCreate(commandArguments[0]);
+
+            Map<Person, BigDecimal> distribution = CalculationUtil.getDistribution(
+                    recipient, members, sum, BigDecimal.valueOf(intDivisor));
+
+            controller.getTransactionService().createTransactionsFromDistribution(
+                    controller.getOperationDate(), distribution, recipient);
+        }
+    }
+  learner_created: true
+- name: build.gradle
+  visible: true
+  text: |-
+    plugins {
+        id 'org.springframework.boot' version '2.2.2.RELEASE'
+        id 'java'
+    }
+
+    apply plugin: 'io.spring.dependency-management'
+
+    sourceCompatibility = '11'
+
+    repositories {
+        mavenCentral()
+    }
+
+    sourceSets.main.resources.srcDirs = ["src/resources"]
+
+    dependencies {
+        implementation 'org.springframework.boot:spring-boot-starter'
+        implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+        runtimeOnly 'com.h2database:h2'
+        testImplementation('org.springframework.boot:spring-boot-starter-test') {
+            exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
+        }
+    }
+  learner_created: true
+- name: src/splitter/repository/PersonRepository.java
+  visible: true
+  text: |
+    package splitter.repository;
+
+    import org.springframework.data.repository.CrudRepository;
+    import org.springframework.stereotype.Repository;
+    import splitter.model.Person;
+
+    import java.util.Optional;
+
+    @Repository
+    public interface PersonRepository extends CrudRepository<Person, Long> {
+
+        Optional<Person> findByName(String name);
+
+    }
+  learner_created: true
+- name: src/splitter/command/MenuCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public enum MenuCommand implements Command {
+        BALANCE(new BalanceCommand()),
+        BORROW(new BorrowCommand()),
+        CASHBACK(new CashBackCommand()),
+        EXIT(null),
+        GROUP(new GroupCommand()),
+        HELP(new HelpCommand()),
+        PURCHASE(new Purchase()),
+        REPAY(new RepayCommand()),
+        SECRETSANTA(new SecretSantaCommand()),
+        WRITEOFF(new WriteOffCommand());
+
+        private final Command command;
+
+        MenuCommand(Command command) {
+            this.command = command;
+        }
+
+        @Override
+        public void execute(Controller controller) {
+            if (command == null) {
+                return;
+            }
+            command.execute(controller);
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/SecretSantaCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+    import splitter.model.Group;
+    import splitter.model.Person;
+    import splitter.util.Util;
+
+    import java.util.ArrayList;
+    import java.util.HashSet;
+    import java.util.List;
+    import java.util.Map;
+    import java.util.Optional;
+    import java.util.Set;
+    import java.util.TreeMap;
+    import java.util.stream.Collectors;
+
+    public class SecretSantaCommand implements Command {
+        @Override
+        public void execute(Controller controller) {
+            String[] operationArguments = controller.getOperationArguments();
+            if (operationArguments.length != 1) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            Optional<Group> optionalGroup = controller
+                    .getGroupService()
+                    .getByName(operationArguments[0]);
+            if (optionalGroup.isEmpty()) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            Set<Person> members = optionalGroup.get().getMembers();
+
+            if (members.size() == 1) {
+                String name = members.stream().findFirst().get().getName();
+                controller.getView().printGifting(name, name);
+                return;
+            }
+
+            List<String> names = members.stream()
+                    .map(Person::getName)
+                    .sorted()
+                    .collect(Collectors.toList());
+
+            Map<String, String> pairs = new TreeMap<>();
+
+            if (members.size() == 2) {
+                pairs.put(names.get(0), names.get(1));
+                pairs.put(names.get(1), names.get(0));
+                controller.getView().printGiftingPairs(pairs);
+                return;
+            }
+
+            Set<String> selected = new HashSet<>();
+            for (String name : names) {
+                List<String> pool = new ArrayList<>(names);
+                pool.remove(name);
+                pool.removeAll(selected);
+                String second = pool.size() == 1
+                        ? pool.get(0)
+                        : pool.get(Util.RANDOM.nextInt(pool.size()));
+                pairs.put(name, second);
+                selected.add(second);
+            }
+            controller.getView().printGiftingPairs(pairs);
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/BorrowCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public class BorrowCommand extends TransactionalOperation implements Command {
+        @Override
+        public void execute(Controller controller) {
+            move(controller, 1, 0);
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/TransactionalOperation.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+    import splitter.model.Person;
+    import splitter.model.Transaction;
+
+    import java.math.BigDecimal;
+    import java.math.RoundingMode;
+
+    public class TransactionalOperation {
+
+        protected void move(Controller controller, int fromIndex, int toIndex) {
+            String[] arguments = controller.getOperationArguments();
+            if (arguments.length != 3) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            BigDecimal sum;
+            try {
+                sum = new BigDecimal(arguments[arguments.length - 1])
+                        .setScale(2, RoundingMode.UNNECESSARY);
+            } catch (Exception e) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            Person from = controller
+                    .getPersonService()
+                    .getByNameOrCreate(arguments[fromIndex]);
+            Person to = controller
+                    .getPersonService()
+                    .getByNameOrCreate(arguments[toIndex]);
+            if (from.equals(to)) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            controller.getTransactionService().create(
+                    new Transaction(controller.getOperationDate(), from, to, sum));
+        }
+    }
+  learner_created: true
+- name: src/splitter/model/Group.java
+  visible: true
+  text: |
+    package splitter.model;
+
+    import javax.persistence.Column;
+    import javax.persistence.Entity;
+    import javax.persistence.FetchType;
+    import javax.persistence.GeneratedValue;
+    import javax.persistence.GenerationType;
+    import javax.persistence.Id;
+    import javax.persistence.JoinTable;
+    import javax.persistence.ManyToMany;
+    import javax.persistence.Table;
+    import java.util.Set;
+
+    @Entity
+    @Table(name = "groupp")
+    public class Group {
+
+        @Id
+        @GeneratedValue(strategy = GenerationType.AUTO)
+        Long id;
+
+        @Column(name = "name")
+        private String name;
+
+        @ManyToMany(fetch = FetchType.EAGER)
+        @JoinTable
+        private Set<Person> members;
+
+        public Group() {
+        }
+
+        public Group(String name, Set<Person> members) {
+            this.name = name;
+            this.members = members;
+        }
+
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public void setMembers(Set<Person> members) {
+            this.members = members;
+        }
+
+        public Set<Person> getMembers() {
+            return members;
+        }
+    }
+  learner_created: true
+- name: src/resources/application.properties
+  visible: true
+  text: |
+    spring.main.banner-mode=off
+    spring.main.web-application-type=NONE
+    logging.level.root=error
+
+    spring.datasource.url=jdbc:h2:file:../testDB.mv.db
+    spring.datasource.driverClassName=org.h2.Driver
+    spring.datasource.username=sa
+    spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+    spring.jpa.hibernate.ddl-auto=update
+
+    #spring.h2.console.enabled=true
+    #spring.h2.console.path=/h2
+    #spring.h2.console.settings.trace=false
+    #spring.jpa.show-sql=true
+  learner_created: true
+- name: src/splitter/model/Transaction.java
+  visible: true
+  text: |
+    package splitter.model;
+
+    import javax.persistence.Column;
+    import javax.persistence.Entity;
+    import javax.persistence.GeneratedValue;
+    import javax.persistence.GenerationType;
+    import javax.persistence.Id;
+    import javax.persistence.ManyToOne;
+    import javax.persistence.Table;
+    import java.math.BigDecimal;
+    import java.time.LocalDate;
+
+    @Entity
+    @Table(name = "transaction")
+    public class Transaction {
+
+        @Id
+        @GeneratedValue(strategy = GenerationType.AUTO)
+        Long id;
+
+        @Column(name = "date")
+        private LocalDate date;
+
+        @ManyToOne
+        private Person creditor;
+
+        @ManyToOne
+        private Person debtor;
+
+        @Column(name = "sum")
+        private BigDecimal sum;
+
+        public Transaction() {
+        }
+
+        public Transaction(LocalDate date, Person creditor, Person debtor, BigDecimal sum) {
+            this.date = date;
+            this.creditor = creditor;
+            this.debtor = debtor;
+            this.sum = sum;
+        }
+
+        public Long getId() {
+            return id;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public LocalDate getDate() {
+            return date;
+        }
+
+        public void setDate(LocalDate date) {
+            this.date = date;
+        }
+
+        public Person getCreditor() {
+            return creditor;
+        }
+
+        public void setCreditor(Person creditor) {
+            this.creditor = creditor;
+        }
+
+        public Person getDebtor() {
+            return debtor;
+        }
+
+        public void setDebtor(Person debtor) {
+            this.debtor = debtor;
+        }
+
+        public BigDecimal getSum() {
+            return sum;
+        }
+
+        public void setSum(BigDecimal sum) {
+            this.sum = sum;
+        }
+    }
+  learner_created: true
+- name: src/splitter/service/GroupService.java
+  visible: true
+  text: |
+    package splitter.service;
+
+    import org.springframework.beans.factory.annotation.Autowired;
+    import org.springframework.stereotype.Component;
+    import splitter.model.Group;
+    import splitter.model.Person;
+    import splitter.repository.GroupRepository;
+
+    import java.util.Collection;
+    import java.util.HashSet;
+    import java.util.Optional;
+    import java.util.Set;
+    import java.util.TreeSet;
+
+    @Component
+    public class GroupService {
+
+        private final GroupRepository groupRepository;
+
+        @Autowired
+        public GroupService(GroupRepository groupRepository) {
+            this.groupRepository = groupRepository;
+        }
+
+        public void create(Group group) {
+            Optional<Group> optionalFetched = groupRepository.findByName(group.getName());
+            optionalFetched.ifPresent(value -> group.setId(value.getId()));
+            groupRepository.save(group);
+        }
+
+        public Optional<Group> getByName(String name) {
+            return groupRepository.findByName(name);
+        }
+
+        public Optional<Set<Person>> groupMembersFromArgumentGroup(
+                String[] argumentGroup, PersonService personService) {
+            if (argumentGroup == null || argumentGroup.length == 0) {
+                return Optional.empty();
+            }
+
+            Set<Person> members = new TreeSet<>();
+            Set<Person> toRemove = new HashSet<>();
+
+            for (String s : argumentGroup) {
+                if (s.matches("-?[A-Z]+")) {
+                    Optional<Group> groupOptional = groupRepository
+                            .findByName(s.replace("-", ""));
+                    if (groupOptional.isEmpty()) {
+                        return Optional.empty();
+                    }
+                    if (s.startsWith("-")) {
+                        toRemove.addAll(groupOptional.get().getMembers());
+                    } else {
+                        members.addAll(groupOptional.get().getMembers());
+                    }
+                    continue;
+                }
+                if (s.startsWith("-")) {
+                    toRemove.add(personService.getByNameOrCreate(s.substring(1)));
+                    continue;
+                }
+                members.add(personService.getByNameOrCreate(s));
+            }
+
+            members.removeAll(toRemove);
+
+            return Optional.of(members);
+        }
+
+        public void addAll(Group group, Collection<Person> newMembers) {
+            changeGroup(group, newMembers, true);
+        }
+
+        public void removeAll(Group group, Collection<Person> toRemove) {
+            changeGroup(group, toRemove, false);
+        }
+
+        private void changeGroup(Group group, Collection<Person> changeMembers,
+                                 boolean isAdding) {
+            groupRepository.findByName(group.getName())
+                    .ifPresent(value -> group.setId(value.getId()));
+            Set<Person> members = group.getMembers();
+
+            if (isAdding) {
+                members.addAll(changeMembers);
+            } else {
+                members.removeAll(changeMembers);
+            }
+
+            group.setMembers(members);
+            groupRepository.save(group);
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/RepayCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+
+    public class RepayCommand extends TransactionalOperation implements Command {
+        @Override
+        public void execute(Controller controller) {
+            move(controller, 0, 1);
+        }
+    }
+  learner_created: true
+- name: src/splitter/command/GroupCommand.java
+  visible: true
+  text: |
+    package splitter.command;
+
+    import splitter.controller.Controller;
+    import splitter.model.Group;
+    import splitter.model.Person;
+
+    import java.util.Optional;
+    import java.util.Set;
+    import java.util.stream.Collectors;
+
+    public class GroupCommand implements Command {
+        @Override
+        public void execute(Controller controller) {
+            String[] arguments = controller.getOperationArguments();
+            if (arguments.length < 2) {
+                controller.getView().printInvalidCommandArguments();
+            }
+
+            GroupMode groupMode;
+            try {
+                groupMode = GroupMode.valueOf(arguments[0].toUpperCase());
+            } catch (IllegalArgumentException e) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            String groupName = arguments[1];
+            if (groupName.matches(".*[a-z].*")) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            Group group = null;
+            if (groupMode != GroupMode.CREATE) {
+                Optional<Group> optionalGroup = controller.getGroupService().getByName(groupName);
+                if (optionalGroup.isEmpty()) {
+                    controller.getView().printUnknownGroup();
+                    return;
+                }
+                group = optionalGroup.get();
+            }
+
+            String[] argumentGroup = controller.getArgumentGroup();
+
+            switch (groupMode) {
+                case CREATE:
+                    createGroup(controller, groupName, argumentGroup);
+                    break;
+                case ADD:
+                    changeGroupStructure(controller, group, argumentGroup, true);
+                    break;
+                case REMOVE:
+                    changeGroupStructure(controller, group, argumentGroup, false);
+                case SHOW:
+                    showGroup(controller, group);
+                    break;
+                default:
+                    controller.getView().printInvalidCommandArguments();
+            }
+        }
+
+        private void createGroup(Controller controller,
+                                 String groupName,
+                                 String[] argumentGroup) {
+            Optional<Set<Person>> optionalMembers = controller
+                    .getGroupService()
+                    .groupMembersFromArgumentGroup(argumentGroup,
+                            controller.getPersonService());
+            if (optionalMembers.isEmpty()) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            controller.getGroupService().create(
+                    new Group(groupName, optionalMembers.get()));
+        }
+
+        private void changeGroupStructure(Controller controller,
+                                          Group group,
+                                          String[] argumentGroup,
+                                          boolean isAdding) {
+            Optional<Set<Person>> optionalSet = controller
+                    .getGroupService()
+                    .groupMembersFromArgumentGroup(argumentGroup, controller.getPersonService());
+            if (optionalSet.isEmpty()) {
+                controller.getView().printInvalidCommandArguments();
+                return;
+            }
+
+            if (isAdding) {
+                controller.getGroupService().addAll(group, optionalSet.get());
+            } else {
+                controller.getGroupService().removeAll(group, optionalSet.get());
+            }
+        }
+
+        private void showGroup(Controller controller, Group group) {
+            Set<Person> members = group.getMembers();
+            controller.getView().printList(
+                    members.stream()
+                            .map(Person::getName)
+                            .sorted()
+                            .collect(Collectors.toList()));
+        }
+
+        enum GroupMode {
+            CREATE, ADD, REMOVE, SHOW;
+        }
+    }
+  learner_created: true
+- name: src/splitter/service/TransactionService.java
+  visible: true
+  text: |
+    package splitter.service;
+
+    import org.springframework.beans.factory.annotation.Autowired;
+    import org.springframework.stereotype.Component;
+    import org.springframework.transaction.annotation.Transactional;
+    import splitter.model.Person;
+    import splitter.model.Transaction;
+    import splitter.repository.TransactionRepository;
+
+    import java.math.BigDecimal;
+    import java.time.LocalDate;
+    import java.util.List;
+    import java.util.Map;
+
+    @Component
+    public class TransactionService {
+
+        private final TransactionRepository transactionRepository;
+
+        @Autowired
+        public TransactionService(TransactionRepository transactionRepository) {
+            this.transactionRepository = transactionRepository;
+        }
+
+        @Transactional(readOnly = true)
+        public List<Transaction> getByDateBeforOrEquals(LocalDate date) {
+            return transactionRepository.findAllByDateIsLessThanEqualOrderByDate(date);
+        }
+
+        @Transactional
+        public void create(Transaction transaction) {
+            transactionRepository.save(transaction);
+        }
+
+        @Transactional
+        public void deleteAllByDateBefore(LocalDate date) {
+            transactionRepository.deleteAllByDateBefore(date);
+        }
+
+        private void createTransactionsFromDistribution(TransactionService transactionService,
+                                                        LocalDate operationDate,
+                                                        Person funder,
+                                                        Map<Person, BigDecimal> distribution) {
+            for (Map.Entry<Person, BigDecimal> entry : distribution.entrySet()) {
+                if (funder.equals(entry.getKey())) {
+                    continue;
+                }
+                transactionService.create(new Transaction(
+                        operationDate,
+                        funder,
+                        entry.getKey(),
+                        entry.getValue()
+                ));
+            }
+        }
+
+        public void createTransactionsFromDistribution(LocalDate operationDate,
+                                                       Person funder,
+                                                       Map<Person, BigDecimal> distribution) {
+            for (Map.Entry<Person, BigDecimal> entry : distribution.entrySet()) {
+                if (funder.equals(entry.getKey())) {
+                    continue;
+                }
+                create(new Transaction(operationDate,
+                        funder,
+                        entry.getKey(),
+                        entry.getValue()));
+            }
+        }
+
+        public void createTransactionsFromDistribution(LocalDate operationDate,
+                                                       Map<Person, BigDecimal> distribution,
+                                                       Person recipient) {
+            for (Map.Entry<Person, BigDecimal> entry : distribution.entrySet()) {
+                if (recipient.equals(entry.getKey())) {
+                    continue;
+                }
+                create(new Transaction(operationDate,
+                        entry.getKey(),
+                        recipient,
+                        entry.getValue()));
+            }
+        }
+
+    }
+  learner_created: true
+- name: src/splitter/repository/TransactionRepository.java
+  visible: true
+  text: |
+    package splitter.repository;
+
+    import org.springframework.data.repository.CrudRepository;
+    import org.springframework.stereotype.Repository;
+    import splitter.model.Transaction;
+
+    import java.time.LocalDate;
+    import java.util.List;
+
+    @Repository
+    public interface TransactionRepository extends CrudRepository<Transaction, Long> {
+
+        List<Transaction> findAllByDateIsLessThanEqualOrderByDate(LocalDate date);
+
+        void deleteAllByDateBefore(LocalDate date);
+    }
+  learner_created: true
+- name: src/splitter/util/CalculationUtil.java
+  visible: true
+  text: |
+    package splitter.util;
+
+    import splitter.model.Person;
+
+    import java.math.BigDecimal;
+    import java.math.RoundingMode;
+    import java.util.Map;
+    import java.util.Set;
+    import java.util.TreeMap;
+
+    public class CalculationUtil {
+        private CalculationUtil() {
+        }
+
+        public static Map<Person, BigDecimal> getDistribution(
+                Person funder, Set<Person> members,
+                BigDecimal sum, BigDecimal divisor) {
+            BigDecimal portion = sum.divide(divisor, RoundingMode.FLOOR);
+
+            Map<Person, BigDecimal> distribution = new TreeMap<>();
+            members.forEach(p -> distribution.put(p, portion));
+
+            BigDecimal remainder = sum.subtract(portion.multiply(divisor));
+            if (remainder.compareTo(BigDecimal.ZERO) != 0) {
+                BigDecimal increment = new BigDecimal("0.01");
+                for (Map.Entry<Person, BigDecimal> entry : distribution.entrySet()) {
+                    distribution.put(entry.getKey(), entry.getValue().add(increment));
+                    remainder = remainder.subtract(increment);
+                    if (remainder.compareTo(BigDecimal.ZERO) == 0) {
+                        break;
+                    }
+                }
+            }
+            distribution.remove(funder);
+
+            return distribution;
+        }
+    }
+  learner_created: true
+- name: src/splitter/repository/GroupRepository.java
+  visible: true
+  text: |
+    package splitter.repository;
+
+    import org.springframework.data.repository.CrudRepository;
+    import org.springframework.stereotype.Repository;
+    import splitter.model.Group;
+
+    import java.util.Optional;
+
+    @Repository
+    public interface GroupRepository extends CrudRepository<Group, Long> {
+
+        Optional<Group> findByName(String name);
+
+    }
+  learner_created: true
+- name: src/splitter/graph/Vertex.java
+  visible: true
+  learner_created: true
+- name: src/splitter/graph/Graph.java
+  visible: true
+  learner_created: true
+- name: src/splitter/graph/VisitStatus.java
+  visible: true
+  learner_created: true
+- name: src/splitter/graph/GraphTest.java
+  visible: true
+  learner_created: true
+- name: src/splitter/command/BalancePerfectCommand.java
+  visible: true
+  learner_created: true
 feedback_link: https://hyperskill.org/projects/142/stages/770/implement#comment
-status: Unchecked
+status: Solved
+feedback:
+  message: Congratulations!
+  time: Wed, 31 Mar 2021 05:57:54 UTC
 record: -1

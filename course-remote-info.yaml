@@ -3,7 +3,7 @@ hyperskill_project:
   ide_files: https://stepik.org/media/attachments/lesson/452671/additional_files.json
   is_template_based: false
   use_ide: true
-update_date: Tue, 23 Mar 2021 18:17:50 UTC
+update_date: Wed, 31 Mar 2021 04:59:45 UTC
 stages:
 - id: 765
   step: 11718
@@ -22,7 +22,7 @@ stages:
   is_completed: true
 - id: 770
   step: 11723
-  is_completed: false
+  is_completed: true
 topics:
   0:
   - title: Immutability
@@ -288,6 +288,8 @@ topics:
     theory_id: 9536
   - title: External resources
     theory_id: 6216
+  - title: YAML
+    theory_id: 12722
   - title: Data and object mapping
     theory_id: 8262
   - title: Libraries
