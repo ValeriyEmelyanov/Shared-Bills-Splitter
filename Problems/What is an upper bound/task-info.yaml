@@ -1,0 +1,22 @@
+type: code
+custom_name: What is an upper bound?
+files:
+- name: src/Main.java
+  visible: true
+  text: "// Do not remove imports\nimport java.lang.reflect.Field;\nimport java.lang.reflect.Method;\n\
+    import java.lang.reflect.ParameterizedType;\nimport java.lang.reflect.WildcardType;\n\
+    import java.util.Set;\nimport java.util.Scanner;\n\nclass ListParameterInspector\
+    \ {\n    // Do not change the method\n    public static void main(String[] args)\
+    \ throws Exception {\n        Scanner scanner = new Scanner(System.in);\n    \
+    \    String methodName = scanner.next();\n\n        ListParameterInspector inspector\
+    \ = new ListParameterInspector();\n        inspector.printParameterType(new TestClass(),\
+    \ methodName);\n    }\n\n    public void printParameterType(TestClass obj, String\
+    \ methodName) throws Exception {\n        // Add implementation here \n    }\n\
+    }"
+  learner_created: false
+feedback_link: https://hyperskill.org/learn/step/11183#comment
+status: Solved
+feedback:
+  message: <html>Correct solution</html>
+  time: Thu, 11 Mar 2021 10:21:42 UTC
+record: -1
