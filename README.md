@@ -1,4 +1,4 @@
-## Music Advisor
+## Shared Bills Splitter
 
 This is a training project from JetBrains Academy.
 (Challenging level)
